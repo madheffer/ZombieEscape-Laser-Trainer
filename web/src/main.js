@@ -23,6 +23,7 @@ import { replayClass } from './lib/dom.js';
 import { isMapName } from './lib/paths.js';
 import { settings, bindSettings, FOV } from './app/settings.js';
 import { installGraphics } from './ui/graphics-ui.js';
+import { canvasAntialias } from './app/graphics.js';
 import { installPerf } from './app/perf.js';
 import { PerfMeter } from './ui/perf-meter.js';
 import { rule } from './app/rules.js';
@@ -69,7 +70,7 @@ import { net, lobby, installCoop, hostStart, abortRound } from './app/coop.js';
 import { simulatedPing } from './app/coop-load.js';
 
 const canvas = $('#view');
-G.renderer = new Renderer(canvas);
+G.renderer = new Renderer(canvas, { antialias: canvasAntialias() });
 G.shake = new ViewShake(); // env_shake (app/view-shake.js)
 G.fade = new ScreenFade($('#screenfade')); // env_fade (app/screen-fade.js)
 G.audio = new GameAudio();
@@ -179,7 +180,7 @@ function applySettings() {
   G.audio.setVolumes({ sfx: settings.sfx * settings.master, music: settings.music * settings.master });
   G.voice?.setVolume(settings.voice * settings.master);
   applyGamma(settings.gamma); // r_fullscreen_gamma (ui/gamma.js)
-  G.renderer.setQuality({ renderScale: settings.renderScale, msaa: settings.msaa, pixelCap: settings.pixelCap, bloom: settings.bloom, reflections: settings.reflections });
+  G.renderer.setQuality({ renderScale: settings.renderScale, msaa: settings.msaa, pixelCap: settings.pixelCap, bloom: settings.bloom, reflections: settings.reflections, particleDetail: settings.particleDetail });
   G.renderer.lighting.setOptions({ fog: settings.fog, reflections: settings.reflections, particleLights: settings.particleLights });
   G.stream?.setMode(streamMode());
 }

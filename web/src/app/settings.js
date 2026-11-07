@@ -41,8 +41,8 @@ export const DEFAULTS = {
   renderScale: 1, msaa: true, fog: true, reflections: true, bakedLighting: true, quality: 0,
   // graphics: the preset those knobs come from (app/graphics.js): Medium (Low on a phone) until one is picked,
   // 'custom' after a hand change. pixelCap: the screen pixel ratio render resolution multiplies (phones are 3x). particleLights: effects
-  // lighting the world. graphicsChosen: the player picked a preset (the map list stops asking)
-  graphics: 'medium', pixelCap: 2, particleLights: true, bloom: true, graphicsChosen: false,
+  // lighting the world. particleDetail: soft particles + smooth ropes. graphicsChosen: the player picked a preset (the map list stops asking)
+  graphics: 'medium', pixelCap: 2, particleLights: true, bloom: true, particleDetail: true, graphicsChosen: false,
   streamDistance: 1, // a streamed world (world/stream.js): 1 auto (area, then what can be seen), 2 area only, 0 the whole map
   touchSens: 1, touchCrouch: false, // phone / tablet: look speed multiplier, crouch as a toggle instead of hold
   // GFL's map edits turned off, per map: { <map>: [edit ids] } (lib/stripper.js; ui/stripper-settings.js). Solo only
@@ -99,7 +99,7 @@ function perMap(v, clean, keep) {
 }
 
 // Saved settings from before a default changed get it once: v2 turned the team's boss fire off by default.
-const SETTINGS_VERSION = 3;
+const SETTINGS_VERSION = 4;
 function migrate(saved) {
   if (!saved || typeof saved !== 'object') return {};
   const v = Number.isInteger(saved.settingsVersion) ? saved.settingsVersion : 1;
@@ -109,6 +109,8 @@ function migrate(saved) {
   if (v < 3 && ['renderScale', 'msaa', 'fog', 'reflections', 'bakedLighting', 'quality', 'streamDistance'].some((k) => k in saved)) {
     out.graphics = 'custom'; out.graphicsChosen = true;
   }
+  // v4 added particleDetail to the presets: a saved Low gets Low's (off), the rest keep the default (on)
+  if (v < 4 && out.graphics === 'low' && !('particleDetail' in saved)) out.particleDetail = false;
   return out;
 }
 
@@ -158,6 +160,7 @@ export function bindSettings(onChange) {
   bindPair('#gamma', '#gamma-num', 'gamma', 1, 2.5, onChange, 0.05);
   bind('#renderscale', 'renderScale', (v) => `${Math.round(v * 100)}%`); bind('#msaa', 'msaa');
   bind('#fog', 'fog'); bind('#reflections', 'reflections'); bind('#bakedlighting', 'bakedLighting'); bind('#quality', 'quality'); bind('#streamdistance', 'streamDistance');
+  bind('#bloom', 'bloom'); bind('#particlelights', 'particleLights'); bind('#particledetail', 'particleDetail');
   // 0-1 like CS2's console values: game sound (the menu's #volume pair, labelled SFX) and `snd_musicvolume`
   bindPair('#mastervol', '#mastervol-num', 'master', 0, 1, onChange, 0.01);
   bindPair('#volume', '#volume-num', 'sfx', 0, 1, onChange, 0.01);

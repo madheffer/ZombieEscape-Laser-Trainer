@@ -16,13 +16,16 @@ const norm0 = (v) => { const l = len(v); return l > 0 ? mul(v, 1 / l) : null; };
 // DAT_18053414c), z = 2*u0 - 1, phi = u1 * 2pi (DAT_1805342c8), r = u2^(1/3) (DAT_1805341b0); (r*s*cos, r*s*sin,
 // r*z) with s = sqrt(1 - z^2). It does not advance the counter. (ported_forces.js randomInBall is the same draw
 // with c910 += 3 folded in.)
-const ballAt = (c, counter) => {
+const ballInto = (c, counter, out) => {
   const b = c.rnd.offset + counter;
   const u0 = T(c, b) * 0.9999 + 0.0001, u1 = T(c, b + 1) * 0.9999 + 0.0001, u2 = T(c, b + 2) * 0.9999 + 0.0001;
   const z = 2 * u0 - 1, phi = u1 * 6.28318548, r = Math.pow(u2, 0.333333343);
   const s = Math.sqrt(Math.max(0, 1 - z * z));
-  return [r * s * Math.cos(phi), r * s * Math.sin(phi), r * z];
+  out[0] = r * s * Math.cos(phi); out[1] = r * s * Math.sin(phi); out[2] = r * z;
+  return out;
 };
+const ballAt = (c, counter) => ballInto(c, counter, [0, 0, 0]);
+const _r = [0, 0, 0];
 const lerpSigned = (off, t) => (off - -off) * t + -off; // (off - (off ^ sign)) * T + (off ^ sign), DAT_180534be0
 
 // One lightning bolt: positions P with radius B, alpha-2 C (1 = a point the rope joins, 0 = a separator),
@@ -39,18 +42,25 @@ function bolt(fn, c, S, E) {
   const twist = ev(fn.m_flBranchTwist, c);
   const endDir = fn.m_nBranchBehavior === 1 || fn.m_nBranchBehavior === 'PARTICLE_LIGHTNING_BRANCH_ENDPOINT_DIR';
   // FUN_18028b4a0: start, end and two separators at the end
-  const P = [S, E, E, E], B = [ev(fn.m_flRadiusStart, c), ev(fn.m_flRadiusEnd, c), 0, 0], C = [1, 1, 0, 0];
-  const D = [uvOffset, uvEnd, uvEnd, uvEnd], L = [1, 1, -1, -1];
-  // FUN_18028c030: a branch from the new midpoint at i + 1, appended after a separator pair
-  const branch = (i, off, mid) => {
-    const depth = L[i + 1] + 1, b1 = B[i + 1], d1 = D[i + 1];
+  let P = [S, E, E, E], B = [ev(fn.m_flRadiusStart, c), ev(fn.m_flRadiusEnd, c), 0, 0], C = [1, 1, 0, 0];
+  let D = [uvOffset, uvEnd, uvEnd, uvEnd], L = [1, 1, -1, -1];
+  // Each pass inserts a midpoint after every joined pair and appends branches at the end, which the same pass then
+  // walks too. The game splices the midpoints in place; here a pass streams into new lists in the same order (the
+  // same points, the same random draws), linear instead of quadratic: a bolt of 8 passes is hundreds of points.
+  // Inside a pass, P / B / C / D / L are the lists being read (branches append to them) and oP.. the ones written.
+  let oP, oB, oC, oD, oL;
+  // FUN_18028c030: a branch from the new midpoint (the last written), appended after a separator pair
+  const branch = (off, mid) => {
+    const m = oP.length - 1;
+    const depth = oL[m] + 1, b1 = oB[m], d1 = oD[m];
     const k = fn.m_bScaleBranchOffset ? depth * bOff : 1;
     const r = ballAt(c, c.rnd.counter);
     c.rnd.counter += 3;
     P.push(mid, mid, mid); B.push(0, 0, b1); C.push(0, 0, 1); D.push(d1, d1, d1); L.push(-1, -1, depth);
-    // length: (|(P[i+1] - E) * 0.25| * 0.75 + |P[0] - P[1]| * 0.75) * 0.5 (DAT_1805341c4 0.75, DAT_1805341b8)
-    const reach = (len(mul(sub(P[i + 1], E), 0.25)) * 0.75 + len(sub(P[0], P[1])) * 0.75) * 0.5;
-    const dir = norm0(sub(P[i + 1], P[i])) || [0, 0, 0]; // FUN_180122c90 with the zero default
+    // length: (|(P[i+1] - E) * 0.25| * 0.75 + |P[0] - P[1]| * 0.75) * 0.5 (DAT_1805341c4 0.75, DAT_1805341b8);
+    // P[0] / P[1] / P[i] / P[i+1] of the list as the game has it spliced so far: the written list's
+    const reach = (len(mul(sub(oP[m], E), 0.25)) * 0.75 + len(sub(oP[0], oP[1])) * 0.75) * 0.5;
+    const dir = norm0(sub(oP[m], oP[m - 1])) || [0, 0, 0]; // FUN_180122c90 with the zero default
     const t = lerpSigned(off, T(c, c.rnd.offset + c.rnd.counter++));
     let p;
     if (!endDir) p = add(add(mul(dir, reach), mid), mul(r, twist * t * k));
@@ -62,24 +72,36 @@ function bolt(fn, c, S, E) {
     P.push(p, p, p); B.push(0, 0, 0); C.push(1, 0, 0); D.push(uv, uv, uv); L.push(depth, -1, -1);
   };
   for (let iter = 0; iter < segments; iter++, offset *= decay) {
+    oP = []; oB = []; oC = []; oD = []; oL = [];
     for (let i = 0; i < P.length; i++) {
+      oP.push(P[i]); oB.push(B[i]); oC.push(C[i]); oD.push(D[i]); oL.push(L[i]);
       const j = i + 1;
-      if (P.length <= j) break;
+      if (P.length <= j) continue; // the last point: the pass ends
       if (C[i] === 0 || C[j] === 0) continue;
       const off = fn.m_bScaleBranchDistance ? offset / (bDist * L[i]) : offset;
-      const d = norm0(sub(P[j], P[i])) || [0, 0, 1];
-      const n = norm0(cross(d, P[i])) || [0, 0, 0];
+      // the vector maths of norm0 / cross / ballAt written out on numbers (the same operations in the same order:
+      // the same floats), as this runs for every point of every bolt each recalc
+      const pi = P[i], pj = P[j];
+      let dx = pj[0] - pi[0], dy = pj[1] - pi[1], dz = pj[2] - pi[2];
+      let l = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (l > 0) { const s = 1 / l; dx *= s; dy *= s; dz *= s; } else { dx = 0; dy = 0; dz = 1; }
+      let nx = dy * pi[2] - dz * pi[1], ny = dz * pi[0] - dx * pi[2], nz = dx * pi[1] - dy * pi[0];
+      l = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      if (l > 0) { const s = 1 / l; nx *= s; ny *= s; nz *= s; } else { nx = 0; ny = 0; nz = 0; }
       const counter = c.rnd.counter;
-      const r = ballAt(c, counter);
+      ballInto(c, counter, _r);
       c.rnd.counter += 4;
       const t = lerpSigned(off, T(c, c.rnd.offset + counter + 3)) / L[i];
-      const mid = add(add(mul(sub(mul(r, off), mul(n, t)), 0.5), mul(n, t)), mul(add(P[j], P[i]), 0.5));
-      P.splice(j, 0, mid); B.splice(j, 0, (B[i] + B[j]) * 0.5); C.splice(j, 0, 1);
-      D.splice(j, 0, (D[i] + D[j]) * 0.5); L.splice(j, 0, L[i]);
+      const mid = [
+        ((_r[0] * off - nx * t) * 0.5 + nx * t) + (pj[0] + pi[0]) * 0.5,
+        ((_r[1] * off - ny * t) * 0.5 + ny * t) + (pj[1] + pi[1]) * 0.5,
+        ((_r[2] * off - nz * t) * 0.5 + nz * t) + (pj[2] + pi[2]) * 0.5,
+      ];
+      oP.push(mid); oB.push((B[i] + B[j]) * 0.5); oC.push(1); oD.push((D[i] + D[j]) * 0.5); oL.push(L[i]);
       const k = recSplit !== 1 ? (1 - L[i] / segments) * recSplit : 1;
-      if (T(c, c.rnd.offset + c.rnd.counter++) < split * k / L[i]) branch(i, off, mid);
-      i++; // past the new midpoint
+      if (T(c, c.rnd.offset + c.rnd.counter++) < split * k / L[i]) branch(off, mid);
     }
+    P = oP; B = oB; C = oC; D = oD; L = oL;
   }
   return { P, B, C, D };
 }

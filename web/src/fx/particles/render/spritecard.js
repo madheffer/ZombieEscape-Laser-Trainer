@@ -207,6 +207,7 @@ const EQUATION = { ADD: THREE.AddEquation, MAX: THREE.MaxEquation };
 
 // Every live spritecard material, so effects.js can point them all at a newly bound lighting set (setFxCamera).
 export const liveMaterials = new Set();
+let copyFrame = 0; // sceneCopyWanted's frame count
 
 /**
  * A spritecard material. `shared` holds the per-frame uniforms every particle material of a side
@@ -240,10 +241,19 @@ export function createSpritecardMaterial(kind, shared, texture) {
     toneMapped: false,
   });
   mat.userData.kind = kind;
+  // the frame it was last drawn (sceneCopyWanted): a new material counts as drawn now, so its first frames have a copy
+  mat.userData.drawnAt = copyFrame;
+  mat.onBeforeRender = () => { mat.userData.drawnAt = copyFrame; };
   liveMaterials.add(mat);
   mat.addEventListener('dispose', () => liveMaterials.delete(mat));
   return mat;
 }
+
+// Soft particles (depth feathering) on or off: the graphics setting (app/graphics.js particleDetail; Low turns it
+// off). Off, no particle needs the scene copy for its depth, a full-screen colour + depth copy each frame
+// (world/scenecopy.js): edges cut hard against the walls instead of fading. Refraction keeps the copy.
+let softParticles = true;
+export function setSoftParticles(on) { softParticles = !!on; }
 
 /** Write one renderer's controls (controls.js) into its material, render state and shader defines included. */
 export function applyControls(mat, ctl) {
@@ -257,7 +267,7 @@ export function applyControls(mat, ctl) {
   const taps = ctl.refractTaps || [];
   taps.slice(0, 25).forEach((t, i) => u.uRefractTaps.value[i].set(t[0], t[1], t[2], 0));
   u.uRefractTapCount.value = Math.min(25, taps.length);
-  const d = mat.defines, layers = Math.max(1, Math.min(4, ctl.layers.length)), feather = ctl.feather ? 1 : 0, refract = ctl.refract ? 1 : 0;
+  const d = mat.defines, layers = Math.max(1, Math.min(4, ctl.layers.length)), feather = ctl.feather && softParticles ? 1 : 0, refract = ctl.refract ? 1 : 0;
   // motion vectors on sprites only: no dumped trail combo carries S_MOTION_VECTORS
   // (and with at most 3 layers: 4 layers + motion would pass WebGL's 16 vertex attributes; the dumped motion combos have 2)
   const motion = ctl.motion && mat.userData.kind === 'sprite' && layers < 4 ? 1 : 0;
@@ -275,9 +285,14 @@ export function applyControls(mat, ctl) {
   mat.depthFunc = s.depthFunc === 'ALWAYS' ? THREE.AlwaysDepth : THREE.LessEqualDepth;
 }
 
-/** Does some live particle material read the scene copy (world/scenecopy.js): depth feathering or refraction. */
+/**
+ * Does a particle material drawn in the last few frames read the scene copy (world/scenecopy.js): depth feathering or
+ * refraction. Called once a frame, before the world pass. Only drawn ones count: a feathered effect elsewhere on the
+ * map (or culled: fx/effects.js) costs no copy. One back on screen reads the last copy for its first frame.
+ */
 export function sceneCopyWanted() {
-  for (const m of liveMaterials) if (m.defines.FEATHER || m.defines.REFRACT) return true;
+  copyFrame++;
+  for (const m of liveMaterials) if ((m.defines.FEATHER || m.defines.REFRACT) && copyFrame - m.userData.drawnAt <= 2) return true;
   return false;
 }
 

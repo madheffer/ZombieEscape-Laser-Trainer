@@ -18,7 +18,8 @@ const HINT = {
   custom: 'Custom: changed in Settings › Graphics.',
 };
 // the Video controls each preset knob is bound to (app/settings.js bindSettings)
-const CONTROLS = { renderScale: '#renderscale', msaa: '#msaa', fog: '#fog', reflections: '#reflections', bakedLighting: '#bakedlighting', quality: '#quality', streamDistance: '#streamdistance' };
+const CONTROLS = { renderScale: '#renderscale', msaa: '#msaa', fog: '#fog', reflections: '#reflections', bakedLighting: '#bakedlighting', quality: '#quality', streamDistance: '#streamdistance',
+  bloom: '#bloom', particleLights: '#particlelights', particleDetail: '#particledetail' };
 
 export function installGraphics({ apply, mapLoaded = () => false }) {
   // until a preset is picked, the knobs sit at this device's default (and follow it to a new device)

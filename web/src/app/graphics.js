@@ -7,24 +7,27 @@
 //
 // What each knob costs, biggest first: render resolution (pixels drawn, x the screen's pixel ratio), the texture /
 // lightmap tier (download, decode, GPU memory), MSAA (4 samples a pixel into a half-float target), particle lights
-// (a loop per pixel over up to 16 lights), reflections (the cubemaps in view), fog, how much of the world streams in.
+// (a loop per pixel over up to 16 lights), bloom (a chain of half-size passes), reflections (the cubemaps in view),
+// particle detail (soft edges' scene copy, rope / lightning vertices), fog, how much of the world streams in.
 // Low is the fast build for phones and old PCs: about a sixth of High's pixels on a phone, nothing optional per pixel.
 import { settings, saveSettings } from './settings.js';
 
 export const PRESET_NAMES = ['low', 'medium', 'high'];
 
+// particleDetail: soft particle edges (depth feathering: a full-screen scene copy each frame) and smooth rope / lightning
+// curves (fx/particles/render spritecard.js setSoftParticles, ropes.js setRopeDetail)
 export const PRESETS = {
   high: {
     quality: 3, renderScale: 1, pixelCap: 2, msaa: true, fog: true, reflections: true, bakedLighting: true,
-    particleLights: true, streamDistance: 1, bloom: true,
+    particleLights: true, streamDistance: 1, bloom: true, particleDetail: true,
   },
   medium: {
     quality: 2, renderScale: 0.85, pixelCap: 1.5, msaa: false, fog: true, reflections: true, bakedLighting: true,
-    particleLights: true, streamDistance: 1, bloom: true,
+    particleLights: true, streamDistance: 1, bloom: true, particleDetail: true,
   },
   low: {
     quality: 1, renderScale: 0.75, pixelCap: 1, msaa: false, fog: false, reflections: false, bakedLighting: true,
-    particleLights: false, streamDistance: 2, bloom: false,
+    particleLights: false, streamDistance: 2, bloom: false, particleDetail: false,
   },
 };
 
@@ -41,6 +44,12 @@ export function isMobile() {
 
 // what a player starts on until they pick one
 export const defaultPreset = () => (isMobile() ? 'low' : 'medium');
+
+// The canvas's own MSAA (the viewmodel and the HUD-side passes draw straight to it): off on Low, where it is a 4x
+// colour + depth buffer the size of the screen for a few edges. The WebGL context fixes it at creation, so a preset
+// change applies on the next page load. The preset as it will be once installGraphics has run (the device default
+// until one is picked); Custom keeps it.
+export const canvasAntialias = () => (settings.graphicsChosen || settings.graphics === 'custom' ? settings.graphics : defaultPreset()) !== 'low';
 
 // Write a preset's knobs into settings. Returns the knobs that changed and only apply on the next map load.
 // chosen: the player picked it (false: the default, set at start until they do)

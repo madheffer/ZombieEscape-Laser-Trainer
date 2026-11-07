@@ -9,7 +9,8 @@ import { boxInView } from './view-box.js';
 import { nameMatches } from '../lib/names.js';
 import { assetKey } from '../lib/paths.js';
 import { setFxCamera, fxShared } from '../fx/effects.js';
-import { sceneCopyWanted } from '../fx/particles/render/spritecard.js';
+import { sceneCopyWanted, setSoftParticles } from '../fx/particles/render/spritecard.js';
+import { setRopeDetail } from '../fx/particles/render/ropes.js';
 import { SceneCopy } from './scenecopy.js';
 import { Bloom, BLOOM_POST_GLSL } from './bloom.js';
 import { PropAnimator, cloneModel } from './anim.js';
@@ -76,8 +77,9 @@ function cpFrom(ent) {
 const MAX_FX_PER_ENTITY = 64;
 
 export class Renderer {
-  constructor(canvas) {
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+  // antialias: the canvas's own MSAA (app/graphics.js canvasAntialias: off on Low), fixed for the context's life
+  constructor(canvas, { antialias = true } = {}) {
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias, powerPreference: 'high-performance' });
     this.renderScale = 1; // settings: render resolution (setQuality)
     this.msaa = true;
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -134,8 +136,11 @@ export class Renderer {
   // pixelCap: the most of the screen's pixel ratio to draw at (phones are 3x; app/graphics.js Low draws at 1x)
   // bloom: CS2's bloom pass (bloom.js; off on Low)
   // water: its quality follows the preset's knobs (low = reflections off, medium = no MSAA, high = both on: world/water.js)
-  setQuality({ renderScale = 1, msaa = true, pixelCap = 2, bloom = true, reflections = true } = {}) {
+  // particleDetail: soft particle edges and smooth ropes (fx/particles/render spritecard.js / ropes.js; off on Low)
+  setQuality({ renderScale = 1, msaa = true, pixelCap = 2, bloom = true, reflections = true, particleDetail = true } = {}) {
     this.bloomOn = bloom !== false;
+    setSoftParticles(particleDetail !== false);
+    setRopeDetail(particleDetail !== false);
     this.water.setQuality(!reflections ? 'low' : !msaa ? 'medium' : 'high');
     const ratio = Math.min(window.devicePixelRatio, Math.max(0.5, pixelCap)) * Math.min(1, Math.max(0.25, renderScale));
     if (Math.abs(this.renderer.getPixelRatio() - ratio) > 1e-3) { this.renderer.setPixelRatio(ratio); this.resize(); }

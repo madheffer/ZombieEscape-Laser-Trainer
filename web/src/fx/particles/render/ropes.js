@@ -2,15 +2,27 @@ import * as THREE from 'three';
 import { createSpritecardMaterial, applyControls, bindTextures, whiteTexture } from './spritecard.js';
 import { spritecardControls, makeInputs } from './controls.js';
 import { colorBlend, srgbToLinear, smoothstep } from './barn.js';
-import { catmullRom, catmullRomTangent, ropeSide, ropeV, screenSizeLimit, vec } from './basis.js';
+import { ropeV, vec } from './basis.js';
 
 // C_OP_RenderRopes / C_OP_RenderTrails: the spritecard trail combo (S_DRAW_AS_TRAIL=1, RE §6) tessellated on the
 // CPU from basis.js, so the strip drawn is the one node tests check. Particles join in collection order
 // (reversed with m_bReverseOrder); a closed loop wraps.
 
 // UNSETTLED (RE §6: tessellation counts are C++ side): a fixed 8 segments per span, inside the
-// renderer's own min/max.
-const SEGMENTS = 8;
+// renderer's own min/max. The graphics setting's reduced particle detail (app/graphics.js, Low) draws 3: a lightning
+// bolt's spans are a few units long, so the curve between its points doesn't show, and it is under half the vertices.
+let SEGMENTS = 8;
+export function setRopeDetail(full) { SEGMENTS = full ? 8 : 3; }
+
+// basis.js catmullRom / catmullRomTangent for one component (the same expressions; t2 = t^2, t3 = t^3)
+const cmr = (a, b, c, d, t, t2, t3) => 0.5 * (2 * b + (c - a) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (3 * b - a - 3 * c + d) * t3);
+const cmrT = (a, b, c, d, t, t2) => 0.5 * (c - a) + (2 * a - 5 * b + 4 * c - d) * t + 1.5 * (3 * b - a - 3 * c + d) * t2;
+// mark the first n values of a buffer attribute for upload
+function upload(attr, n) {
+  attr.clearUpdateRanges();
+  attr.addUpdateRange(0, n);
+  attr.needsUpdate = true;
+}
 
 export class RopeRenderer {
   constructor(shared, assets) {
@@ -73,43 +85,64 @@ export class RopeRenderer {
     const index = this.geometry.index.array;
     const rot = vc.c4[3], cr = Math.cos(rot), sr = Math.sin(rot);
     const frac = (x) => x - Math.floor(x);
+    const fu = frac(vc.c5[0] + 0.5), fv = frac(vc.c5[1] + 0.5);
+    // basis.js catmullRom / catmullRomTangent / ropeSide / screenSizeLimit written out on numbers below (the same
+    // operations in the same order: the same vertices): this loop runs for every vertex of every rope each frame,
+    // and a lightning bolt is hundreds of points x S segments. ropeSide's normal: mode 3 the particle normal, 2 up,
+    // else towards the camera.
+    const mode = Math.min(4, vc.orientation);
+    const limit = vc.c2[2] > 0, c0 = vc.c0;
     let v = 0, t3 = 0;
     for (let s = 0; s < spans; s++) {
       const j0 = wrap(s - 1), j1 = wrap(s), j2 = wrap(s + 1), j3 = wrap(s + 2);
       const fadeDot = (a, b) => 1 - smoothstep(vc.c2[0], vc.c2[1], Math.abs(vec.dot(vec.normalize(vec.sub(P[a], P[b])), vec.normalize(vec.sub(cam, P[a])))));
       const f0 = fadeDot(j0, j1), f1 = fadeDot(j1, j2);                           // TVS:2768-2775
+      const p0 = P[j0], p1 = P[j1], p2 = P[j2], p3 = P[j3], c1 = C[j1], c2 = C[j2], n1 = N[j1], n2 = N[j2];
       const base = v;
       for (let k = 0; k <= S; k++) {
-        const t = k / S;
-        const sp = catmullRom(P[j0], P[j1], P[j2], P[j3], t);
-        const tan = catmullRomTangent(P[j0], P[j1], P[j2], P[j3], t);
-        let w = catmullRom(Rr[j0], Rr[j1], Rr[j2], Rr[j3], t);                    // TVS:2784
-        const nrm = vec.normalize(vec.add(vec.mul(N[j1], 1 - t), vec.mul(N[j2], t)));
-        const side = ropeSide(vc.orientation, tan, cam, sp, nrm);
-        const c = [0, 1, 2, 3].map((q) => C[j1][q] + (C[j2][q] - C[j1][q]) * t);
-        c[3] *= f0 + (f1 - f0) * t;
-        if (vc.c2[2] > 0) {
-          const lim = screenSizeLimit(w, Math.hypot(...vec.sub(cam, sp)), vc.c0);
-          w = lim.r; for (let q = 0; q < 4; q++) c[q] *= lim.colorMul;
+        const t = k / S, tt = t * t, ttt = tt * t;
+        const spx = cmr(p0[0], p1[0], p2[0], p3[0], t, tt, ttt), spy = cmr(p0[1], p1[1], p2[1], p3[1], t, tt, ttt), spz = cmr(p0[2], p1[2], p2[2], p3[2], t, tt, ttt);
+        const tx = cmrT(p0[0], p1[0], p2[0], p3[0], t, tt), ty = cmrT(p0[1], p1[1], p2[1], p3[1], t, tt), tz = cmrT(p0[2], p1[2], p2[2], p3[2], t, tt);
+        let w = cmr(Rr[j0], Rr[j1], Rr[j2], Rr[j3], t, tt, ttt);                  // TVS:2784
+        let nx, ny, nz;
+        if (mode === 3) {
+          nx = n1[0] * (1 - t) + n2[0] * t; ny = n1[1] * (1 - t) + n2[1] * t; nz = n1[2] * (1 - t) + n2[2] * t;
+          const l = Math.hypot(nx, ny, nz);
+          if (l > 0) { const q = 1 / l; nx *= q; ny *= q; nz *= q; } else { nx = 0; ny = 0; nz = 0; }
+        } else if (mode === 2) { nx = 0; ny = 0; nz = 1; } else { nx = cam[0] - spx; ny = cam[1] - spy; nz = cam[2] - spz; }
+        let sx = ty * nz - tz * ny, sy = tz * nx - tx * nz, sz = tx * ny - ty * nx;
+        const sl = Math.hypot(sx, sy, sz);
+        if (sl > 0) { const q = 1 / sl; sx *= q; sy *= q; sz *= q; } else { sx = 0; sy = 0; sz = 0; }
+        let cR = c1[0] + (c2[0] - c1[0]) * t, cG = c1[1] + (c2[1] - c1[1]) * t, cB = c1[2] + (c2[2] - c1[2]) * t, cA = c1[3] + (c2[3] - c1[3]) * t;
+        cA *= f0 + (f1 - f0) * t;
+        if (limit) {
+          const d = Math.hypot(cam[0] - spx, cam[1] - spy, cam[2] - spz);
+          let colorMul = 1;
+          if (w > c0[1] * d) colorMul = w > c0[2] * d ? 0 : 1 - (w - c0[1] * d) / (d * (c0[2] - c0[1]));
+          w = Math.min(Math.max(w, c0[0] * d), c0[3] * d);
+          cR *= colorMul; cG *= colorMul; cB *= colorMul; cA *= colorMul;
         }
         const vv = vc.c3[3] > 0 ? ropeV(D[s], D[s + 1], t, vc.c3[2], vc.c3[3]) : 1 - t;   // TVS:173
-        for (const x of [-1, 1]) {
-          const p3 = vec.add(sp, vec.mul(side, w * x));                           // TVS:3041
-          pos.set(p3, v * 3);
-          const u0 = x * 0.5 + 0.5 - 0.5, v0 = vv - 0.5;
-          uv.set([(u0 * cr - v0 * sr) / vc.c5[2] + frac(vc.c5[0] + 0.5), (u0 * sr + v0 * cr) / vc.c5[3] + frac(vc.c5[1] + 0.5), 1, 1], v * 4);
-          colr.set(c, v * 4);
+        const v0 = vv - 0.5;
+        for (let x = -1; x <= 1; x += 2) {
+          const wx = w * x;
+          pos[v * 3] = spx + sx * wx; pos[v * 3 + 1] = spy + sy * wx; pos[v * 3 + 2] = spz + sz * wx; // TVS:3041
+          const u0 = x * 0.5 + 0.5 - 0.5;
+          uv[v * 4] = (u0 * cr - v0 * sr) / vc.c5[2] + fu; uv[v * 4 + 1] = (u0 * sr + v0 * cr) / vc.c5[3] + fv; uv[v * 4 + 2] = 1; uv[v * 4 + 3] = 1;
+          colr[v * 4] = cR; colr[v * 4 + 1] = cG; colr[v * 4 + 2] = cB; colr[v * 4 + 3] = cA;
           v++;
         }
       }
       for (let k = 0; k < S; k++) {
         const a = base + k * 2;
-        index.set([a, a + 1, a + 3, a, a + 3, a + 2], t3); t3 += 6;
+        index[t3] = a; index[t3 + 1] = a + 1; index[t3 + 2] = a + 3; index[t3 + 3] = a; index[t3 + 4] = a + 3; index[t3 + 5] = a + 2; t3 += 6;
       }
     }
-    for (const name of ['position', 'uv4', 'color4']) this.geometry.attributes[name].needsUpdate = true;
-    this.geometry.index.needsUpdate = true;
-    this.geometry.setDrawRange(0, t3);
+    // only what was written goes up to the GPU, not the whole (doubling) buffer
+    const g = this.geometry;
+    for (const [name, size] of [['position', 3], ['uv4', 4], ['color4', 4]]) upload(g.attributes[name], v * size);
+    upload(g.index, t3);
+    g.setDrawRange(0, t3);
     return ctl;
   }
 
