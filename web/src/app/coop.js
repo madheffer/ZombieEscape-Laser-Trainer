@@ -61,6 +61,9 @@ class Round {
     this.peerItems = new Map();
     for (const id of d.holders) if (id !== net.you && this.kit.heal) this.peerItems.set(id, [{ ...this.kit.heal, uses: 0, readyAt: 0 }]);
     if (d.ultima != null && d.ultima !== net.you && this.kit.ultima) this.peerItems.set(d.ultima, [{ ...this.kit.ultima, uses: 0, readyAt: 0 }]);
+    // watcher: you are one of the room's spectators: the round runs here so you can watch it, and nothing of yours
+    // goes to the server (it would drop it anyway: server/coop-round.js watchers)
+    this.watcher = !!d.watcher;
     this.players = new Map(d.roster.map((m) => [m.id, { id: m.id, name: m.name, alive: true, deadAt: null, diedWall: 0, hits: 0, lasers: 0, balls: 0, boss: 0 }]));
     this.me = net.you;
     this.ended = false;
@@ -114,13 +117,13 @@ class Round {
   }
 
   // you used your map item (E) after tick k: the server's copy presses it before tick k + 1, as yours does
-  used(k) { if (!this.ended && !S.run?.spectating) { this.sendTicks(); net.game({ t: 'use', r: this.r, k }); } }
+  used(k) { if (!this.ended && !S.run?.spectating && !this.watcher) { this.sendTicks(); net.game({ t: 'use', r: this.r, k }); } }
 
   // your gun's reload started: the server's shot check holds your next rounds until it's done
-  reloaded(w) { if (!this.ended && !S.run?.spectating) net.game({ t: 'reload', r: this.r, w }); } // w: the slot reloaded
+  reloaded(w) { if (!this.ended && !S.run?.spectating && !this.watcher) net.game({ t: 'reload', r: this.r, w }); } // w: the slot reloaded
 
   // you bought a gun (app/buy.js): the server's shot check holds you to its numbers from now on
-  bought(gun) { if (!this.ended && !S.run?.spectating) net.game({ t: 'weapon', r: this.r, gun }); }
+  bought(gun) { if (!this.ended && !S.run?.spectating && !this.watcher) net.game({ t: 'weapon', r: this.r, gun }); }
 
   // the stage's clear / fail: the server's own copy of the run decides it, so nothing is sent
   outcome() {}
@@ -129,7 +132,7 @@ class Round {
   // keys [forward, side] (sent with the batch for your body's plant and turn on their screens)
   record(k, player, keys) {
     this.keys = keys;
-    if (this.ended || S.run?.spectating) return;
+    if (this.ended || S.run?.spectating || this.watcher) return;
     if (!this.ticks.length) this.tick0 = k;
     const o = player.origin; // to 1/1000 u: small frames, and far finer than any trigger edge
     this.ticks.push([r3(o[0]), r3(o[1]), r3(o[2]), player.ducked ? 1 : 0]);
@@ -137,7 +140,7 @@ class Round {
 
   pump(now) {
     const run = S.run;
-    if (!run || run.done || this.ended) return;
+    if (!run || run.done || this.ended || this.watcher) return;
     if (now - this.sendAt >= STATE_MS && this.ticks.length) { this.sendAt = now; this.sendTicks(); }
     if (now - this.bossAt >= BOSS_MS) {
       this.bossAt = now;
@@ -168,7 +171,7 @@ class Round {
   // the spectator bar (ui/hud.js): who you watch, and that Mouse 1 changes it when there's anyone else to watch
   spectateLabel() {
     const v = this.spectateView();
-    if (!v) return 'You died';
+    if (!v) return this.watcher ? 'Spectating · nobody left alive' : 'You died';
     return `Spectating ${this.name(v.id)}${this.alive.filter((p) => p.id !== this.me).length > 1 ? ' · Mouse 1: next' : ''}`;
   }
   // someone alive to watch: your death goes straight to their eyes (no death cam)
@@ -177,7 +180,7 @@ class Round {
   peerSamples(id) { const p = G.peers.list.get(id); const q = p?.track?.samples || p?.samples || []; return { n: q.length, last: q[q.length - 1]?.t ?? 0 }; }
 
   // ---- loading: the stage is loaded and drawn here (app/readiness.js); the server starts the clock when all are
-  sendReady() { if (!this.ended) { this.readyIds.add(this.me); net.game({ t: 'ready', r: this.r, ping: simulatedPing() }); } }
+  sendReady() { if (!this.ended && !this.watcher) { this.readyIds.add(this.me); net.game({ t: 'ready', r: this.r, ping: simulatedPing() }); } }
   waitLine() { return waitLine(); } // app/coop-load.js: the ready ones among those still in
 
   // the room's cheats for the HUD's status line (who is alive is the run panel's CO-OP a/n: app/run-panel.js)
@@ -257,12 +260,14 @@ export function hostStart(i, mode) {
 async function onStart(d) {
   const roster = Array.isArray(d.roster) ? d.roster.filter((m) => Number.isInteger(m?.id)).slice(0, 8).map((m) => ({ id: m.id, name: cleanText(m.name, 24) || 'Player' })) : [];
   if (!Number.isInteger(d.r) || !Number.isInteger(d.seed) || d.seed < 1 || !isMapName(d.map) || !['normal', 'endless'].includes(d.mode)) return;
-  if (!roster.some((m) => m.id === net.you)) { lobby.busy = true; G.lobby.render(); return; }
+  // not in it: a spectator the round started with watches it; anyone else waits for the next one
+  const watcher = !roster.some((m) => m.id === net.you);
+  if (watcher && !(Array.isArray(d.watchers) && d.watchers.includes(net.you))) { lobby.busy = true; G.lobby.render(); return; }
   const start = {
     r: d.r, map: d.map, stage: d.stage == null ? null : cleanText(d.stage, 80), mode: d.mode, kind: ROOM_KINDS[0], // one mode
     rules: { ...cleanRules(d.rules), seed: d.seed }, roster, leader: Number.isInteger(d.leader) ? d.leader : 0,
     holders: Array.isArray(d.holders) ? d.holders.filter((id) => roster.some((m) => m.id === id)) : [],
-    ultima: Number.isInteger(d.ultima) && roster.some((m) => m.id === d.ultima) ? d.ultima : null, ultimaAuto: d.ultimaAuto === true,
+    ultima: Number.isInteger(d.ultima) && roster.some((m) => m.id === d.ultima) ? d.ultima : null, ultimaAuto: d.ultimaAuto === true, watcher,
   };
   // the round's messages that arrive while we load (its 'wait', or the 'go' and our 'dead' if we load too slowly)
   // are kept and played once the round exists here
@@ -271,7 +276,7 @@ async function onStart(d) {
   // everyone's load progress on the loading screen (app/coop-load.js), and ours to the server while we load
   beginRoster(start, net.you);
   lockPing(); // your simulated ping, fixed until the round ends
-  startReports(start.r, (m) => net.game(m));
+  if (!watcher) startReports(start.r, (m) => net.game(m));
   const stop = (note) => { if (starting === pend) { starting = null; G.loading.close(false); unlockPing(); } if (note) G.lobby.note(note); };
   // the loading screen (ui/loading.js) until the server's go
   G.loading.begin(start.map, start.stage, S.map?.name === start.map && S.map.loaded ? 300 : 0);
@@ -291,6 +296,8 @@ async function onStart(d) {
   S.mp = new Round(start);
   G.peers.set(roster.filter((m) => m.id !== net.you));
   startScenario(i, start.mode);
+  // a spectator is out of the play from the first tick: the map runs, you watch the players (loop.js step)
+  if (watcher && S.run) { S.run.spectating = true; S.run.watching = true; }
   for (const { d: m, at } of pend.queue) onGame(m, at);
   // already in the game (the owner's click, or still locked in from the last round): play at once; otherwise
   // the menu shows Resume until you click in
@@ -395,7 +402,9 @@ function onLeft(why) {
   unlockPing();
   lobby.busy = false;
   G.peers.clear();
-  if (run && !run.done && run.spectating) { run.spectating = false; finish('dead'); }
+  // a spectator's watch is just over (no run of theirs to end)
+  if (run?.watching) { run.done = true; G.pause(); }
+  else if (run && !run.done && run.spectating) { run.spectating = false; finish('dead'); }
   if (S.paused) G.audio.pause(); // the round's sound played on behind the menu (main.js G.pause); solo pauses
   G.lobby.render();
   if (why === 'kicked') G.lobby.note('The room owner removed you from the room');

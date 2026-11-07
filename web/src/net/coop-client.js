@@ -8,7 +8,7 @@
 //   net.on('left', why) / net.on('error', msg) / net.on('status', status)
 //   net.on('chat', ({ id, name, text, team, dead } | { flood })) // room chat; net.chat(text, team) sends
 //   net.on('voice', (id, first, opus))   // a teammate's voice packet (server/coop-voice.js); net.voice(first, opus) sends
-import { cleanSettings, cleanText } from '../lib/room-rules.js';
+import { cleanSettings, cleanText, seated, ROOM_CAP } from '../lib/room-rules.js';
 import { cleanChat, cleanChatName } from '../lib/chat-colors.js';
 import { isMapName } from '../lib/paths.js';
 import { emptyTally } from '../lib/laser-score.js';
@@ -53,6 +53,9 @@ export class CoopClient {
   // the room owner: changes settings, picks the stage, kicks (the server checks)
   get isHost() { return !!this.room && this.room.owner === this.you; }
   member(id) { return this.room?.members.find((m) => m.id === id) || null; }
+  // in the room as a spectator (the player slots were full): you watch the rounds; take() asks for a free slot
+  get isSpectator() { return !!this.member(this.you)?.spec; }
+  get freeSlot() { return !!this.room && seated(this.room.members).length < this.room.settings.max; }
 
   setStatus(s, detail = '') { this.status = s; this.emit('status', s, detail); }
 
@@ -94,6 +97,7 @@ export class CoopClient {
   setSettings(settings) { if (this.isHost) this.send({ t: 'settings', settings }); }
   setMap(map) { if (this.isHost && isMapName(map)) this.send({ t: 'map', map }); }
   kick(id) { if (this.isHost) this.send({ t: 'kick', id }); }
+  take() { if (this.isSpectator) this.send({ t: 'take' }); } // the server gives the slot to whoever asked first
   start(map, stage, mode) { if (this.isHost) this.send({ t: 'start', map, stage, mode }); }
   // the next round's stage, chosen on the room screen (everyone in the room sees it)
   pick(map, stage, mode) { if (this.isHost && isMapName(map)) this.send({ t: 'pick', map, stage, mode }); }
@@ -135,8 +139,8 @@ export class CoopClient {
       case 'welcome': this.you = m.you | 0; break;
       case 'room': {
         if (!ROOM_CODE.test(m.code) || !Array.isArray(m.members)) return;
-        const members = m.members.filter((x) => Number.isInteger(x?.id)).slice(0, 8).map((x) => ({
-          id: x.id, name: cleanText(x.name, 24) || 'Player', ping: Number.isInteger(x.ping) ? Math.max(0, Math.min(500, x.ping)) : 0, tally: cleanTally(x.tally) }));
+        const members = m.members.filter((x) => Number.isInteger(x?.id)).slice(0, ROOM_CAP).map((x) => ({
+          id: x.id, name: cleanText(x.name, 24) || 'Player', ping: Number.isInteger(x.ping) ? Math.max(0, Math.min(500, x.ping)) : 0, tally: cleanTally(x.tally), spec: x.spec === true }));
         const round = m.round && Number.isInteger(m.round.r)
           ? { r: m.round.r, stage: cleanText(m.round.stage, 60), ids: Array.isArray(m.round.ids) ? m.round.ids.filter(Number.isInteger) : [] } : null;
         const prev = this.room;
@@ -144,7 +148,7 @@ export class CoopClient {
         // next: the owner's pick for the next round (the room screen): { map, stage, stageName, mode, endless } or null
         const n = m.next && typeof m.next === 'object' && isMapName(m.next.map) ? m.next : null;
         const next = n ? { map: n.map, stage: typeof n.stage === 'string' ? cleanText(n.stage, 80) : null, stageName: cleanText(n.stageName, 60) || 'Free roam', mode: n.mode === 'endless' ? 'endless' : 'normal', endless: n.endless === true } : null;
-        this.room = { code: m.code, owner: m.owner | 0, you: this.you, members, settings: cleanSettings(m.settings, members.length), map: isMapName(m.map) ? m.map : '', next, round,
+        this.room = { code: m.code, owner: m.owner | 0, you: this.you, members, settings: cleanSettings(m.settings, seated(members).length), map: isMapName(m.map) ? m.map : '', next, round,
           score: { humans: count(m.score?.humans), zombies: count(m.score?.zombies) } };
         this.emit('room', this.room, prev);
         break;
@@ -158,7 +162,7 @@ export class CoopClient {
       // room chat (server/coop-chat.js): { id, name, text, team, dead }, or { flood } when you typed too fast
       case 'chat':
         if (m.flood === true) { this.emit('chat', { flood: true }); break; }
-        if (this.room && cleanChat(m.text)) this.emit('chat', { id: m.id | 0, name: cleanChatName(m.name), text: cleanChat(m.text), team: m.team === true, dead: m.dead === true });
+        if (this.room && cleanChat(m.text)) this.emit('chat', { id: m.id | 0, name: cleanChatName(m.name), text: cleanChat(m.text), team: m.team === true, dead: m.dead === true, spec: m.spec === true });
         break;
       default: if (this.room && GAME.has(m.t)) this.emit('game', m);
     }
@@ -169,7 +173,7 @@ function cleanListing(x) {
   if (!x || !ROOM_CODE.test(x.code)) return null;
   return {
     code: x.code, name: cleanText(x.name, 40) || 'Room', kind: x.kind === 'versus' ? 'versus' : 'coop',
-    players: Math.max(0, x.players | 0), max: Math.max(2, x.max | 0), map: isMapName(x.map) ? x.map : '',
+    players: Math.max(0, x.players | 0), max: Math.max(2, x.max | 0), watching: Math.max(0, x.watching | 0), watchable: x.watchable === true, map: isMapName(x.map) ? x.map : '',
     playing: !!x.playing, stage: cleanText(x.stage, 60), cheats: Array.isArray(x.cheats) ? x.cheats.filter((c) => typeof c === 'string').slice(0, 5) : [],
   };
 }

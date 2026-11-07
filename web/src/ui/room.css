@@ -51,6 +51,10 @@
 .rm-slot.empty { border: 1px dashed var(--line); background: transparent; }
 .rm-slot.empty .rm-avatar { background: transparent; border: 1px dashed var(--line); animation: rm-wait 1.8s ease-in-out infinite; }
 .rm-slot.empty .rm-pname { color: var(--dim); font-weight: 400; font-style: italic; }
+.rm-slot.empty .rm-take { margin-left: auto; padding: 4px 14px; }
+.rm-spec-head { margin: 6px 0 0; font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); }
+.rm-slot.spec { background: transparent; }
+.rm-slot.spec .rm-pname { color: var(--dim); }
 @keyframes rm-wait { 50% { opacity: 0.35; } }
 .room .rm-kick { border: 0; background: transparent; color: var(--dim); width: 26px; height: 26px; border-radius: 50%; padding: 0; font-size: 12px; }
 .room .rm-kick:hover { background: rgba(255, 77, 77, 0.2); color: #fff; }

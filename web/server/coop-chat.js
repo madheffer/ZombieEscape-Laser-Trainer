@@ -27,5 +27,5 @@ export function roomChat(c, m, now, { flooded } = {}) {
   if (!text) return null;
   if (isFlooding(c, now)) { flooded?.(); return null; }
   const p = room.round && !room.round.ended ? room.round.players.get(c.id) : null;
-  return { t: 'chat', id: c.id, name: cleanChatName(c.name), text, team: m.team === true, dead: !!p && p.alive === false };
+  return { t: 'chat', id: c.id, name: cleanChatName(c.name), text, team: m.team === true, dead: !!p && p.alive === false, spec: !!c.spec };
 }

@@ -161,11 +161,11 @@ export class Lobby {
     this.codeOut.replaceChildren('Code ', text('b', '', room.code));
     this.badges.replaceChildren(
       text('i', `badge ${s.public ? 'public' : 'private'}`, s.public ? 'Public' : 'Private'),
-      text('i', 'badge count', `${room.members.length}/${s.max}`));
+      text('i', 'badge count', `${room.members.filter((m) => !m.spec).length}/${s.max}`));
     this.ownerBtns.hidden = guest;
     this.members.replaceChildren(...room.members.map((m) => {
       const li = el('li', m.id === room.owner ? 'owner' : '');
-      li.append(text('span', '', m.name + (m.id === net.you ? ' (you)' : '')));
+      li.append(text('span', '', m.name + (m.id === net.you ? ' (you)' : '') + (m.spec ? ' · spectating' : '')));
       if (m.id === room.owner) li.title = 'Room owner: picks the stage and the settings';
       if (!guest && m.id !== net.you) li.append(button('✕', 'kick', () => { if (confirm(`Remove ${m.name} from the room?`)) net.kick(m.id); }, { 'aria-label': `Remove ${m.name}`, title: 'Remove from the room' }));
       return li;
@@ -180,7 +180,8 @@ export class Lobby {
     if (!cheatsOn(r).length) chips.push(['No cheats', 'clean']);
     this.rules.replaceChildren(...chips.map(([t, cls]) => text('li', cls || '', t)));
     const kindHint = 'Everyone plays the same stage, together and against each other: clear it, with the fewest hits.';
-    this.hint.textContent = state.busy ? `A round is on (${room.round?.stage || 'a stage'}): you'll be in the next one.`
+    this.hint.textContent = net.isSpectator ? 'You are spectating: you watch the rounds. Join a free slot on the room screen to play.'
+      : state.busy ? `A round is on (${room.round?.stage || 'a stage'}): you'll be in the next one.`
       : guest ? `${owner?.name || 'The owner'} picks the stage. ${kindHint}` : `A stage you pick here becomes the room's next round (Start it on the room screen). ${kindHint}`;
   }
 }

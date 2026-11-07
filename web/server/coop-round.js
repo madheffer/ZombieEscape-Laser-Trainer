@@ -8,7 +8,7 @@
 //   - it decides the end and who did best (end): the survivors win when the stage clears (the last one alive plays
 //     on alone), fewest hits is the best run; all down, whoever lasted longest.
 // Players only ever talk to the server, so nobody learns anyone else's address.
-import { cleanText, itemHolders, bossHumans } from '../src/lib/room-rules.js';
+import { cleanText, itemHolders, bossHumans, seated } from '../src/lib/room-rules.js';
 import { isWeaponName } from '../src/lib/weapons.js';
 import { moveKeys } from '../src/lib/move-keys.js';
 import { cleanWeaponAction } from '../src/lib/weapon-action.js';
@@ -45,7 +45,7 @@ export class Round {
     this.seed = Math.floor(Math.random() * 0xfffe) + 1;
     // the boss HP's humans, fixed for the round from who starts it (lib/room-rules.js bossHumans): every client and
     // every server copy runs the map at this count, and a death doesn't lower it
-    rules = { ...rules, humans: bossHumans(rules, room.members.length) };
+    rules = { ...rules, humans: bossHumans(rules, seated(room.members).length) };
     this.map = map; this.stage = stage; this.mode = mode; this.kind = kind; this.rules = rules;
     this.t0 = null; // set by go(): until then the round is loading and its clock stands at 0
     this.ready = new Set();
@@ -56,7 +56,10 @@ export class Round {
     this.dmg = new Map();
     this.clockAt = 0; this.bossAt = 0; this.scoreAt = 0; this.scoreSent = '';
     this.ended = false;
-    this.players = new Map(room.members.map((c) => [c.id, { id: c.id, name: c.name, steamId: c.user?.steamId || null, alive: true, deadAt: null, cheat: '', budget: { at: 0, n: 0 },
+    // the room's spectators (lib/room-rules.js seated) are not in it: they get its messages and watch (watchers), and
+    // everything they send it is dropped (no entry in players)
+    this.watchers = new Set(room.members.filter((c) => c.spec).map((c) => c.id));
+    this.players = new Map(seated(room.members).map((c) => [c.id, { id: c.id, name: c.name, steamId: c.user?.steamId || null, alive: true, deadAt: null, cheat: '', budget: { at: 0, n: 0 },
       load: 0, loadAt: Date.now(), readyMs: null, left: false, ping: 0 }])); // left: gone or never loaded (out, not beaten)
     // who starts holding the map's heal and its ultima: the room's choice against who is in this round, one item each
     // (lib/room-rules.js itemHolders). Each copy also runs the ultima someone else holds (pressed when they press it,
@@ -84,12 +87,12 @@ export class Round {
   get roundTick() { return Math.floor(this.elapsed / TICK); }
   get stageTime() { return Math.max(0, this.elapsed - this.countdown); }
   get alive() { return [...this.players.values()].filter((p) => p.alive); }
-  broadcast(msg, except) { for (const c of this.room.members) if (c !== except && this.players.has(c.id)) this.io.send(c, msg); }
+  broadcast(msg, except) { for (const c of this.room.members) if (c !== except && (this.players.has(c.id) || this.watchers.has(c.id))) this.io.send(c, msg); }
 
   startMessage() {
     return {
       t: 'start', r: this.r, seed: this.seed, map: this.map, stage: this.stage.id, mode: this.mode, kind: this.kind,
-      rules: this.rules, leader: this.leader, holders: this.holders, ultima: this.ultimaHolder, ultimaAuto: this.ultimaAuto, roster: [...this.players.values()].map((p) => ({ id: p.id, name: p.name })),
+      rules: this.rules, leader: this.leader, holders: this.holders, ultima: this.ultimaHolder, ultimaAuto: this.ultimaAuto, roster: [...this.players.values()].map((p) => ({ id: p.id, name: p.name })), watchers: [...this.watchers],
     };
   }
 

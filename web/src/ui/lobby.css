@@ -97,3 +97,4 @@ body.mp-guest #restart { display: none !important; }
   .browse-row .br-count { display: none; }
   .lobby .grow { display: none; }
 }
+.br-watching { font: 400 11px ui-monospace, Consolas, monospace; color: var(--dim); font-style: normal; }

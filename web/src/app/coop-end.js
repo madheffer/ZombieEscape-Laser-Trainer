@@ -15,7 +15,8 @@ export function showRoundEnd(round, d) {
   const me = round.me;
   const won = d.winners.includes(me);
   const top = d.best.includes(me);
-  const solo = round.players.size === 1;
+  const watching = !!round.watcher; // a spectator's card: the round's verdict and table, nothing of theirs
+  const solo = round.players.size === 1 && !watching;
   const endless = round.mode === 'endless';
   const names = (ids) => ids.map((id) => (id === me ? 'You' : round.name(id))).join(' & ');
   const hitsOf = (id) => d.stats.find((s) => s.id === id)?.hits ?? 0;
@@ -23,7 +24,7 @@ export function showRoundEnd(round, d) {
   const scenario = S.scenario;
   // the console's report (a death already had one): your part of the round
   const mine = d.stats.find((s) => s.id === me);
-  if (S.run && S.map) reportRun(S.run, { result: d.result === 'win' && won ? 'win' : d.result === 'over' ? 'over' : 'lose', scenario, map: S.map.name, time: mine?.at ?? d.at });
+  if (S.run && S.map && !watching) reportRun(S.run, { result: d.result === 'win' && won ? 'win' : d.result === 'over' ? 'over' : 'lose', scenario, map: S.map.name, time: mine?.at ?? d.at });
   let kind, title, subtitle;
   if (d.result === 'win') {
     kind = 'win';
@@ -64,12 +65,12 @@ export function showRoundEnd(round, d) {
 
   const card = {
     kind,
-    kicker: `${scenario?.name || 'Free roam'} · online${endless ? ' · endless' : ''}`,
-    title, subtitle, badges, times: strip.times, place: placeBlock(boardPlace(board, d.at, { endless, counts })),
+    kicker: `${scenario?.name || 'Free roam'} · online${endless ? ' · endless' : ''}${watching ? ' · spectating' : ''}`,
+    title, subtitle, badges: watching ? [] : badges, times: watching ? [] : strip.times, place: watching ? null : placeBlock(boardPlace(board, d.at, { endless, counts })),
     note: round.isHost ? '' : 'Waiting for the room owner to start the next round',
     buttons: buttons(round),
   };
-  if (solo || !mine) {
+  if (solo || (!mine && !watching)) {
     card.stats = mine ? [['Hits taken', String(mine.hits)], ['Lasers dodged', String(mine.dl)], ['Balls dodged', String(mine.db)]] : [];
   } else {
     card.awards = awards(fair, { me, endless, aliveFor, names });

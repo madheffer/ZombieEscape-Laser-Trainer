@@ -48,8 +48,8 @@ export function scoreboardData(now = performance.now()) {
   }
   for (const m of room.members) {
     if (inRound.has(m.id)) continue;
-    // between rounds everyone is a human; during one, whoever isn't in it watches
-    if (mp) spec.push(row(m.id, m.name, m.ping, m.tally, { dead: false, flash: null }));
+    // between rounds every player is a human; during one, whoever isn't in it watches (and the room's spectators always)
+    if (mp || m.spec) spec.push(row(m.id, m.name, m.ping, m.tally, { dead: false, flash: null }));
     else humans.push(row(m.id, m.name, m.ping, m.tally, { dead: false, flash: null }));
   }
   // CS2 lists each team by score, best first

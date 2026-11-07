@@ -55,11 +55,11 @@ export function consoleSay(text) {
 export function systemLine(line) { chat?.add(line); }
 
 // every part cleaned here too, whoever sent it (the server already did): shown as text only (ui/chat.js)
-function playerLine({ name, text, team, dead }) {
+function playerLine({ name, text, team, dead, spec }) {
   const msg = cleanChat(text);
   if (!msg) return;
   const tag = team ? '[CT]' : '[ALL]';
-  const who = `${tag} ${cleanChatName(name)}${dead ? ' [DEAD]' : ''}`;
+  const who = `${tag} ${cleanChatName(name)}${spec ? ' [SPEC]' : dead ? ' [DEAD]' : ''}`; // spec: a room spectator
   chat.add([[' ', CT_NAME], [who, CT_NAME], [`: ${msg}`, '#ffffff']]);
 }
 

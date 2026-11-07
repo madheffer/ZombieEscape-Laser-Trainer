@@ -107,6 +107,7 @@ export function stageStatus(run) {
   }
   const area = G.stream && run.loading === 'loading the area' && S.player ? G.stream.progress(S.player.origin) : null;
   const s = stepProgress(run.loading || 'loading', area);
-  if (S.mp && run.go) s.text = `Started without you (you will watch): ${s.text}`;
+  if (S.mp?.watcher) s.text = `Spectating: ${s.text}`;
+  else if (S.mp && run.go) s.text = `Started without you (you will watch): ${s.text}`;
   return s;
 }

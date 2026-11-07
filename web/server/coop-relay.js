@@ -1,4 +1,8 @@
-// The co-op server: rooms of up to 8 players over one WebSocket each (path /coop). Rooms and rounds live HERE:
+// The co-op server: rooms of up to 8 players over one WebSocket each (path /coop), and spectators past the room's
+// player slots, up to 64 members in all (lib/room-rules.js ROOM_CAP). Spectators (c.spec) watch the rounds, chat
+// and talk; every round and owner message from them is ignored, they are never the owner, and a free slot is
+// theirs only by asking: 'take', first come first served, which one message at a time on this thread makes exact.
+// Rooms and rounds live HERE:
 // the room owner (whoever made it; the next oldest member if they leave) can change the room's settings, pick
 // the stage and kick, and the server checks every one of those; a round (coop-round.js) is run by the server,
 // not by a player. Public rooms show up in a list anyone can browse; private ones only by code / invite link.
@@ -12,7 +16,7 @@
 import { WebSocketServer } from 'ws';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cleanName, cleanSettings, cheatsOn, ROOM_MAX } from '../src/lib/room-rules.js';
+import { cleanName, cleanSettings, cheatsOn, seated, ROOM_MAX, ROOM_CAP } from '../src/lib/room-rules.js';
 import { isMapName } from '../src/lib/paths.js';
 import { Round } from './coop-round.js';
 import { tallyRound, tallyOf, forget } from './coop-tally.js';
@@ -106,7 +110,7 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
       const live = [...rooms.values()].filter((r) => r.round && !r.round.ended);
       return {
         online: wss.clients.size,
-        rooms: [...rooms.values()].filter((r) => r.settings.public && r.members.length < r.settings.max).length,
+        rooms: [...rooms.values()].filter((r) => r.settings.public && seated(r.members).length < r.settings.max).length,
         rounds: live.length, playing: live.reduce((n, r) => n + r.round.players.size, 0),
       };
     },
@@ -114,7 +118,7 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
 
   const roomView = (room) => ({
     code: room.code, owner: room.owner, settings: room.settings, map: room.map, next: room.next || null,
-    members: room.members.map((m) => ({ id: m.id, name: m.name, ping: m.ping || 0, tally: tallyOf(room, m.id) })),
+    members: room.members.map((m) => ({ id: m.id, name: m.name, ping: m.ping || 0, tally: tallyOf(room, m.id), ...(m.spec ? { spec: true } : {}) })),
     score: room.score || { humans: 0, zombies: 0 }, // the scoreboard's team score (coop-tally.js)
     round: room.round && !room.round.ended ? { r: room.round.r, stage: room.round.stage.name, ids: [...room.round.players.keys()] } : null,
   });
@@ -131,9 +135,12 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
     ev('leave', { room: room.code, ...who(c), why, inRound: room.round && !room.round.ended ? room.round.r : undefined, left: room.members.length });
     if (!room.members.length) { clearTimeout(room.pingT); rooms.delete(room.code); ev('room.closed', { room: room.code }); return; }
     if (wasOwner) {
-      room.owner = room.members[0].id; // the next oldest runs the room
+      // the next oldest player runs the room; a room of spectators only: the oldest of them, seated (every slot is free)
+      const next = seated(room.members)[0] || room.members[0];
+      next.spec = false;
+      room.owner = next.id;
       room.startAt = 0; // a new owner can start at once (START_MS was the last owner's)
-      ev('room.owner', { room: room.code, ...who(room.members[0]) });
+      ev('room.owner', { room: room.code, ...who(next) });
     }
     // the heal holder they were (rules.heal = their id) is nobody now: a random player carries it instead
     if (room.settings.rules.heal === c.id) room.settings = { ...room.settings, rules: { ...room.settings.rules, heal: 'random' } };
@@ -146,7 +153,8 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
   function publicList() {
     return [...rooms.values()].filter((r) => r.settings.public).map((r) => ({
       code: r.code, name: r.settings.name || `${r.members.find((m) => m.id === r.owner)?.name || 'Someone'}'s room`,
-      kind: r.settings.kind, players: r.members.length, max: r.settings.max, map: r.map || '',
+      kind: r.settings.kind, players: seated(r.members).length, max: r.settings.max, map: r.map || '',
+      watching: r.members.length - seated(r.members).length, watchable: r.members.length < ROOM_CAP,
       playing: !!(r.round && !r.round.ended), stage: r.round && !r.round.ended ? r.round.stage.name : '',
       cheats: cheatsOn(r.settings.rules),
     })).sort((a, b) => (a.playing - b.playing) || (b.players - a.players)).slice(0, 100);
@@ -197,7 +205,7 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
     try { m = JSON.parse(String(raw)); } catch { return; }
     if (!m || typeof m !== 'object' || typeof m.t !== 'string') return;
     const room = c.room, round = room?.round;
-    const owner = !!room && room.owner === c.id;
+    const owner = !!room && room.owner === c.id && !c.spec; // a spectator is never the owner (leave seats one)
     switch (m.t) {
       case 'hello':
         c.name = cleanName(m.name);
@@ -217,6 +225,7 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
         if (!code) return send(c, { t: 'error', msg: 'Could not make a room code' });
         // kicked: bannedSteam their Steam accounts, banned their connections (both the room's life), bannedAddr a guest's
         // address -> until when (KICK_ADDR_MS)
+        c.spec = false;
         const r = { code, members: [c], owner: c.id, settings: cleanSettings(m.settings), map: isMapName(m.map) ? m.map : '', round: null, banned: new Set(), bannedSteam: new Set(), bannedAddr: new Map() };
         rooms.set(code, r);
         c.room = r;
@@ -231,19 +240,33 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
         if (!r) { joinFailed(c, now); return send(c, { t: 'error', msg: `No room ${CODE.test(code) ? code : ''}`.trim() }); }
         if (r === room) return announce(r);
         if (r.banned.has(c.id) || (c.user && r.bannedSteam.has(c.user.steamId)) || (r.bannedAddr.get(c.addr) || 0) > now) return send(c, { t: 'error', msg: 'You were removed from that room' });
-        if (r.members.length >= r.settings.max) return send(c, { t: 'error', msg: `Room ${code} is full` });
+        // the player slots full: in as a spectator, while the room has room for one
+        const spec = seated(r.members).length >= r.settings.max;
+        if (spec && r.members.length >= ROOM_CAP) return send(c, { t: 'error', msg: `Room ${code} is full` });
         leave(c);
         c.name = uniqueName(r, c.name, c);
+        c.spec = spec;
         r.members.push(c);
         c.room = r;
-        ev('room.join', { room: code, ...who(c), members: r.members.length, steam: !!c.user, midRound: r.round && !r.round.ended ? r.round.r : undefined });
+        ev('room.join', { room: code, ...who(c), members: r.members.length, spec: spec || undefined, steam: !!c.user, midRound: r.round && !r.round.ended ? r.round.r : undefined });
         announce(r);
         break;
       }
       case 'leave': leave(c); send(c, { t: 'left' }); break;
+      // a spectator takes a free player slot: the first to ask gets it (messages are handled one at a time, so two
+      // clicks at once are two checks in order), the rest hear it was taken. A round on now goes on without them:
+      // they play from the next one
+      case 'take': {
+        if (!room || !c.spec) return;
+        if (seated(room.members).length >= room.settings.max) return send(c, { t: 'error', msg: 'That slot was taken' });
+        c.spec = false;
+        ev('room.take', { room: room.code, ...who(c), players: seated(room.members).length });
+        announce(room);
+        break;
+      }
       case 'settings':
         if (!owner) return;
-        room.settings = cleanSettings(m.settings, room.members.length);
+        room.settings = cleanSettings(m.settings, seated(room.members).length);
         announce(room); // a round in progress keeps the rules it started with
         break;
       case 'map': if (owner && isMapName(m.map)) { room.map = m.map; if (room.next?.map !== m.map) room.next = null; announce(room); } break;

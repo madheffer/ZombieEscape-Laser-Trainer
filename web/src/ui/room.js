@@ -1,6 +1,7 @@
 // The room screen: where a multiplayer room waits between rounds. Everything on one page:
 //   left   the room code, big, with Copy code / Copy invite link; the players (empty slots wait for more to join;
-//          the owner can remove someone; everyone's simulated ping); your name and your own ping; the room's chat
+//          the owner can remove someone; everyone's simulated ping), then the spectators (a full room's extra
+//          members: an open slot has Join for them, first click wins); your name and your own ping; the room's chat
 //          (ui/room-chat.js); the room's rules
 //   right  the map + stage picker (ui/room-picker.js): the owner picks, everyone sees the pick
 //   bottom the next round (map, stage, Normal / Endless) and Start round (owner) or who it waits for (the rest)
@@ -9,7 +10,7 @@
 // ui/settings-panel.js) open in a sheet over it. Names and room text come from the server: textContent only.
 import './room.css';
 import { S, G } from '../app/state.js';
-import { cheatsOn, CHEAT_LABELS, humansLabel, itemLabels } from '../lib/room-rules.js';
+import { cheatsOn, CHEAT_LABELS, humansLabel, itemLabels, seated } from '../lib/room-rules.js';
 import { SettingsPanel } from './settings-panel.js';
 import { settings } from '../app/settings.js';
 import { $ } from '../lib/dom.js';
@@ -204,28 +205,24 @@ export class RoomScreen {
     if (document.activeElement !== this.pingIn) { this.pingIn.value = settings.ping; fillSlider(this.pingIn); }
     this.pingOut.textContent = `${settings.ping} ms`;
 
-    // players: the members, then empty slots up to the room's size
-    this.countEl.textContent = `${room.members.length}/${s.max}`;
+    // players: the seated members, then empty slots up to the room's size, then the spectators
+    const players = seated(room.members), specs = room.members.filter((m) => m.spec);
+    const spectator = net.isSpectator;
+    this.countEl.textContent = `${players.length}/${s.max}${specs.length ? ` · ${specs.length} watching` : ''}`;
     const key = JSON.stringify([room.members, room.owner, host, s.max]);
     if (key !== this.slotKey) {
       this.slotKey = key;
-      const rows = room.members.map((m) => {
-        const li = el('li', `rm-slot${m.id === room.owner ? ' owner' : ''}${m.id === net.you ? ' you' : ''}`);
-        const sq = el('span', 'rm-avatar', (m.name || '?').slice(0, 1).toUpperCase());
-        sq.dataset.voiceId = String(m.id); // lit while they talk (app/voice.js)
-        sq.append(voiceBadge());
-        li.append(sq, el('span', 'rm-pname', m.name));
-        li.append(el('span', `rm-ms${m.ping ? '' : ' zero'}`, `${m.ping || 0} ms`));
-        if (m.id === room.owner) li.append(el('span', 'rm-tag owner', 'Host'));
-        if (m.id === net.you) li.append(el('span', 'rm-tag', 'You'));
-        if (m.id !== net.you && G.voice) li.append(this.muteBtn(m));
-        if (host && m.id !== net.you) li.append(btn('✕', 'rm-kick', () => { if (confirm(`Remove ${m.name} from the room?`)) net.kick(m.id); }, `Remove ${m.name}`));
-        return li;
-      });
-      for (let i = room.members.length; i < s.max; i++) {
+      const rows = players.map((m) => this.memberRow(m, room, host));
+      for (let i = players.length; i < s.max; i++) {
         const li = el('li', 'rm-slot empty');
-        li.append(el('span', 'rm-avatar'), el('span', 'rm-pname', 'Waiting for a player…'));
+        li.append(el('span', 'rm-avatar'), el('span', 'rm-pname', spectator ? 'Open slot' : 'Waiting for a player…'));
+        // a spectator takes it with a click; the server seats whoever's click reached it first
+        if (spectator) li.append(btn('Join', 'primary rm-take', () => net.take(), 'Take this slot and play from the next round'));
         rows.push(li);
+      }
+      if (specs.length) {
+        rows.push(el('li', 'rm-spec-head', `Spectators · ${specs.length}`));
+        for (const m of specs) rows.push(this.memberRow(m, room, host));
       }
       // who is talking stays lit through the rebuild (app/voice.js marks the squares every 50 ms)
       const talking = new Set([...this.slots.querySelectorAll('.talking')].map((e) => e.dataset.voiceId));
@@ -259,14 +256,31 @@ export class RoomScreen {
     for (const b of this.modeBtns) { b.setAttribute('aria-checked', String(b.dataset.mode === (next?.mode || 'normal'))); b.disabled = !host; }
 
     const busy = room.round && !room.round.ids.includes(net.you);
-    const alone = room.members.length < 2;
+    const alone = players.length < 2;
     this.startBtn.hidden = !host;
     this.startBtn.disabled = !next || !!busy || net.status !== 'online';
     this.startBtn.textContent = alone ? 'Start alone' : 'Start round';
     this.waitEl.textContent = net.status !== 'online' ? 'Reconnecting to the server…'
+      : spectator ? (net.freeSlot ? 'Spectating: a slot is open, Join it to play' : `Spectating: the slots are full (${s.max}/${s.max}). You watch the rounds; Join when a slot opens`)
       : busy ? `A round is on (${room.round.stage || 'a stage'}): you'll be in the next one`
-        : host ? (alone ? 'Waiting for players to join… or start alone' : `${room.members.length} players ready to go`)
+        : host ? (alone ? 'Waiting for players to join… or start alone' : `${players.length} players ready to go`)
           : `Waiting for ${owner?.name || 'the host'} to start`;
+  }
+
+  // one member's row: their square (lit while they talk), name, ping, tags, mute and the owner's remove
+  memberRow(m, room, host) {
+    const net = this.net;
+    const li = el('li', `rm-slot${m.id === room.owner ? ' owner' : ''}${m.id === net.you ? ' you' : ''}${m.spec ? ' spec' : ''}`);
+    const sq = el('span', 'rm-avatar', (m.name || '?').slice(0, 1).toUpperCase());
+    sq.dataset.voiceId = String(m.id); // lit while they talk (app/voice.js)
+    sq.append(voiceBadge());
+    li.append(sq, el('span', 'rm-pname', m.name));
+    li.append(el('span', `rm-ms${m.ping ? '' : ' zero'}`, `${m.ping || 0} ms`));
+    if (m.id === room.owner) li.append(el('span', 'rm-tag owner', 'Host'));
+    if (m.id === net.you) li.append(el('span', 'rm-tag', 'You'));
+    if (m.id !== net.you && G.voice) li.append(this.muteBtn(m));
+    if (host && m.id !== net.you) li.append(btn('✕', 'rm-kick', () => { if (confirm(`Remove ${m.name} from the room?`)) net.kick(m.id); }, `Remove ${m.name}`));
+    return li;
   }
 
   // a card picks Normal, its ∞ Endless (the bottom bar's Normal / Endless switches it after)

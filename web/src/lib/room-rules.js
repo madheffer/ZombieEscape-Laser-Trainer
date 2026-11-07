@@ -12,6 +12,12 @@
 
 export const ROOM_KINDS = ['coop'];
 export const ROOM_MAX = 8;
+// A room holds up to this many members, players and spectators together (a CS2 server's 64 slots): past the room's
+// player slots (settings.max, up to ROOM_MAX) the rest join as spectators (member.spec): they watch the rounds, talk
+// and type, and nothing else. A free player slot goes to the first spectator who asks for it (server/coop-relay.js 'take').
+export const ROOM_CAP = 64;
+// the members who play (the rest spectate)
+export const seated = (members) => members.filter((m) => !m.spec);
 export const CHEATS = ['god', 'hitboxes', 'autoBhop'];
 
 // The defaults: the map's boss HP for who is playing, no team fire, no fall damage, no cheats.
@@ -58,7 +64,7 @@ export function cleanRules(r) {
   return out;
 }
 
-// { name, public, kind, max, rules }; `members` = how many are in the room now (max never drops below it)
+// { name, public, kind, max, rules }; `members` = how many play in the room now (max never drops below it)
 export function cleanSettings(s, members = 1) {
   const o = s && typeof s === 'object' ? s : {};
   const max = Number.isInteger(o.max) ? o.max : SETTINGS_DEFAULTS.max;

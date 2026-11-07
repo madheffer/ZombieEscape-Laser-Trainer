@@ -67,9 +67,13 @@ export class RoomBrowser {
     main.append(sub);
     const count = el('span', 'br-count', `${r.players}/${r.max}`);
     count.title = 'Players';
-    const join = el('button', r.players >= r.max ? 'ghost' : 'primary', r.players >= r.max ? 'Full' : 'Join');
+    if (r.watching) { count.append(el('i', 'br-watching', ` +${r.watching}`)); count.title = `Players, +${r.watching} watching`; }
+    // full: in as a spectator while it has room for one (server/coop-relay.js)
+    const full = r.players >= r.max;
+    const join = el('button', full ? 'ghost' : 'primary', full ? (r.watchable ? 'Watch' : 'Full') : 'Join');
     join.type = 'button';
-    join.disabled = r.players >= r.max;
+    join.disabled = full && !r.watchable;
+    if (full && r.watchable) join.title = 'The player slots are full: watch as a spectator, take a slot when one opens';
     join.setAttribute('aria-label', `Join ${r.name}`);
     join.addEventListener('click', () => this.onJoin(r.code));
     li.append(main, count, join);
