@@ -4,10 +4,10 @@
 //   Strip     every screenshot in a row that drifts sideways forever; its edges fade out (home.css). It is a real
 //             scroll box: swipe it on a phone, drag-scroll / wheel on a desktop, Tab through its tiles. The
 //             drift pauses while you hover, touch or focus it, and is off with prefers-reduced-motion.
-import { isMapName, versioned } from '../lib/paths.js';
-import { displayName } from './maps.js';
+import { isMapName } from '../lib/paths.js';
+import { mapPictures } from './map-pics.js';
+import { displayName, gameTag } from './maps.js';
 
-const SHOT = /^\d{1,2}\.jpg$/;
 const FADE_MS = 8000;
 const SPEED = 28; // px per second
 const RESUME_MS = 2500; // after a touch / wheel / focus leaves
@@ -15,16 +15,10 @@ const RESUME_MS = 2500; // after a touch / wheel / focus leaves
 function el(tag, cls, t) { const e = document.createElement(tag); if (cls) e.className = cls; if (t != null) e.textContent = t; return e; }
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// a map's screenshot URLs (its index.json entry), in its own order
-const shotUrlsOf = (m) => (isMapName(m?.name) && Array.isArray(m.shots) ? m.shots.filter((f) => typeof f === 'string' && SHOT.test(f)) : [])
-  .map((f) => versioned(`maps/${m.name}/shots/${f}`, m.version));
-
-// a map's first screenshot URL, or null (the leaderboards' and profiles' map art, ui/rank-bits.js)
-export const mapShot = (m) => shotUrlsOf(m)[0] ?? null;
-
-// every (map, screenshot) pair, maps interleaved so one map's shots don't all sit together
+// every (map, picture) pair (ui/map-pics.js: its card picture, then its screenshots), maps interleaved so one
+// map's pictures don't all sit together
 export function shotsOf(maps) {
-  const per = maps.filter((m) => isMapName(m.name)).map((m) => shotUrlsOf(m).map((url) => ({ map: m, url })));
+  const per = maps.filter((m) => isMapName(m.name)).map((m) => mapPictures(m).map((url) => ({ map: m, url })));
   const out = [];
   for (let i = 0; per.some((l) => i < l.length); i++) for (const l of per) if (l[i]) out.push(l[i]);
   return out;
@@ -96,7 +90,11 @@ export class Strip {
     img.decoding = 'async';
     img.draggable = false;
     const cap = el('span', 'hs-cap');
-    cap.append(el('b', null, title), el('i', null, s.map.scenarios ? `${s.map.scenarios} stages` : 'Free roam'));
+    const meta = el('i');
+    const tag = gameTag(s.map.game);
+    if (tag) meta.append(tag);
+    meta.append(s.map.scenarios ? `${s.map.scenarios} stages` : 'Free roam');
+    cap.append(el('b', null, title), meta);
     b.append(img, cap);
     b.addEventListener('click', () => this.onPick(s.map.name));
     if (copy) { b.tabIndex = -1; b.setAttribute('aria-hidden', 'true'); } else b.setAttribute('aria-label', `Play ${title}`);

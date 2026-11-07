@@ -10,7 +10,7 @@
 import { el, button, KIND, isMe, avatar, place, tabs, skeleton, emptyState, mapArt, meter, shortDate } from './rank-bits.js';
 import { profile } from './board-data.js';
 import { formatTime, plural, thousands, ago } from '../lib/format.js';
-import { mapShot } from './home-hero.js';
+import { mapShot } from './map-pics.js';
 import { mapTitle } from './board.js';
 import { playButton, viewsBadge } from './replay-buttons.js';
 import { RESULT } from './home-history.js';

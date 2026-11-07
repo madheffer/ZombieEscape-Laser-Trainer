@@ -11,7 +11,7 @@ import { mapBoard, mapStages } from './board-data.js';
 import { account } from '../app/account.js';
 import { formatTime, plural, thousands } from '../lib/format.js';
 import { displayName } from './maps.js';
-import { mapShot } from './home-hero.js';
+import { mapShot } from './map-pics.js';
 import { shotUrls } from './stage-card.js';
 
 const CHEVRON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';

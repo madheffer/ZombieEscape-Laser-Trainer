@@ -12,6 +12,14 @@ import { readMapEntities } from './map-entities.mjs';
 import { groupStages } from '../web/src/lib/stage-groups.js';
 import { stripperEdits } from '../web/src/lib/stripper.js';
 
+// the game a map was built for, the picker card's tag: a CS2 bake is "cs2"; a Source 1 bake's BSP version (the
+// manifest's exporter, "lasers-bake source1 (VBSP 21)") is 21 for CS:GO, 19 / 20 for CS:S
+function gameOf(m) {
+  if (m.engine !== 'source1') return 'cs2';
+  const v = Number(/VBSP (\d+)/.exec(String(m.exporter))?.[1]);
+  return v && v < 21 ? 'css' : 'csgo';
+}
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../web/public');
 const mapsDir = path.join(root, 'maps');
 const maps = [];
@@ -72,7 +80,7 @@ for (const name of fs.readdirSync(mapsDir).sort()) {
   });
   for (const id of Object.keys(words)) if (!edits.some((e) => e.id === id)) console.warn(`${name}: scenario "stripper" names ${id}, not one of the map's GFL edits`);
   maps.push({
-    name, title: file.title || m.title || name, description: file.description || '', workshop: file.workshop || '',
+    name, title: file.title || m.title || name, description: file.description || '', workshop: file.workshop || '', game: gameOf(m),
     scenarios: list.length, parts, version: m.version, shots, items, stageShots, stageShotsVersion, card,
     ...(edits.length ? { edits } : {}),
   });

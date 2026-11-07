@@ -5,7 +5,7 @@
 // Everything on a card comes from index.json, which is built from map / scenario files: text goes in through
 // textContent only.
 import { mapRecordCounts } from '../app/records.js';
-import { isMapName, versioned } from '../lib/paths.js';
+import { mapShot } from './map-pics.js';
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -17,6 +17,13 @@ function el(tag, cls, text) {
 // "ze_ffxii_westersand_v8" -> "ffxii westersand v8": the card's big title (the real name stays under it)
 export function displayName(name) {
   return String(name).replace(/^ze_/i, '').replace(/_+/g, ' ').trim() || String(name);
+}
+
+// the game a map was built for (index.json `game`, tools/index-maps.mjs): the small tag beside its name
+// (menu.css .map-game), also on the home page's map strip; null for an index without it
+const GAMES = { cs2: 'CS2', csgo: 'CS:GO', css: 'CS:S' };
+export function gameTag(game) {
+  return Object.hasOwn(GAMES, game) ? el('span', `map-game ${game}`, GAMES[game]) : null;
 }
 
 // a stable hue per map, so each card has its own colour without any art
@@ -53,13 +60,14 @@ export class MapPicker {
     btn.setAttribute('aria-label', `${m.title || m.name}: ${m.scenarios || 'no'} stages`);
 
     const art = el('span', 'map-art');
-    // a picture from the map (index.json `card`: its version; maps/<name>/card.webp), else the colour block
-    if (isMapName(m.name) && typeof m.card === 'string' && /^[a-z0-9]{1,16}$/.test(m.card)) {
+    // the map's main picture (ui/map-pics.js: its card picture, else its first screenshot), else the colour block
+    const pic = mapShot(m);
+    if (pic) {
       const img = el('img', 'map-pic');
       img.alt = '';
       img.decoding = 'async';
       img.loading = 'lazy';
-      img.src = versioned(`maps/${m.name}/card.webp`, [m.version, m.card].filter(Boolean).join('.'));
+      img.src = pic;
       art.classList.add('has-pic');
       art.append(img);
     }
@@ -67,7 +75,11 @@ export class MapPicker {
     if (current) art.append(el('span', 'map-badge', 'loaded'));
 
     const body = el('span', 'map-body');
-    body.append(el('span', 'map-id', m.name));
+    const idRow = el('span', 'map-id-row');
+    idRow.append(el('span', 'map-id', m.name));
+    const tag = gameTag(m.game);
+    if (tag) idRow.append(tag);
+    body.append(idRow);
     if (m.description) body.append(el('span', 'map-desc', m.description));
 
     const parts = el('span', 'map-parts');
