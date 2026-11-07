@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { isMapName, isStageId } from '../web/src/lib/paths.js';
 import { mapItems } from '../web/src/world/items.js';
 import { readMapEntities } from './map-entities.mjs';
-import { groupStages } from '../web/src/lib/stage-groups.js';
+import { groupStages, isListed } from '../web/src/lib/stage-groups.js';
 import { stripperEdits } from '../web/src/lib/stripper.js';
 
 // the game a map was built for, the picker card's tag: a CS2 bake is "cs2"; a Source 1 bake's BSP version (the
@@ -36,6 +36,7 @@ for (const name of fs.readdirSync(mapsDir).sort()) {
   const groupOf = new Map(list.map((s) => [s.id, s.group]));
   const parts = [];
   for (const s of list) {
+    if (!isListed(s)) continue; // a hidden single attack (lib/stage-groups.js)
     const g = String((s.parent ? groupOf.get(s.parent) : s.group) || 'Stages');
     let p = parts.find((x) => x.name === g);
     if (!p) parts.push((p = { name: g, stages: 0, bosses: 0, endless: 0 }));
@@ -81,7 +82,7 @@ for (const name of fs.readdirSync(mapsDir).sort()) {
   for (const id of Object.keys(words)) if (!edits.some((e) => e.id === id)) console.warn(`${name}: scenario "stripper" names ${id}, not one of the map's GFL edits`);
   maps.push({
     name, title: file.title || m.title || name, description: file.description || '', workshop: file.workshop || '', game: gameOf(m),
-    scenarios: list.length, parts, version: m.version, shots, items, stageShots, stageShotsVersion, card,
+    scenarios: list.filter(isListed).length, parts, version: m.version, shots, items, stageShots, stageShotsVersion, card,
     ...(edits.length ? { edits } : {}),
   });
 }

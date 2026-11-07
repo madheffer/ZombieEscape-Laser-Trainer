@@ -7,7 +7,7 @@ import { loadScenarios } from '../world/assets.js';
 import { shotsOf } from './home-hero.js';
 import { displayName } from './maps.js';
 import { stageCard, shotUrls, personalBest, FREE_ROAM } from './stage-list.js';
-import { groupStages } from '../lib/stage-groups.js';
+import { groupStages, isListed } from '../lib/stage-groups.js';
 
 function el(tag, cls, t) { const e = document.createElement(tag); if (cls) e.className = cls; if (t != null) e.textContent = t; return e; }
 
@@ -76,7 +76,7 @@ export class RoomPicker {
     if (this.map !== map) return;
     const thumb = shotUrls(info);
     const byParent = new Map();
-    list.forEach((s, i) => { if (s?.parent) { if (!byParent.has(s.parent)) byParent.set(s.parent, []); byParent.get(s.parent).push(i); } });
+    list.forEach((s, i) => { if (s?.parent && isListed(s)) { if (!byParent.has(s.parent)) byParent.set(s.parent, []); byParent.get(s.parent).push(i); } });
     const parts = groupStages(list);
     parts.push({ name: 'Explore', items: [-1] });
     // the owner picks (a card plays it, its ∞ plays it endless); everyone else only looks, so no details to play from

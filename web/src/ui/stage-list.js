@@ -5,7 +5,7 @@
 import './stage-list.css';
 import { S, G } from '../app/state.js';
 import { $ } from '../lib/dom.js';
-import { groupStages } from '../lib/stage-groups.js';
+import { groupStages, isListed } from '../lib/stage-groups.js';
 import { settings, saveSettings } from '../app/settings.js';
 import { displayName } from './maps.js';
 import { mapLoadout } from '../world/items.js';
@@ -24,6 +24,7 @@ export function renderStageList(info, onPick) {
   const head = $('#map-head');
   const byParent = new Map();
   S.scenarios.forEach((s, i) => {
+    if (!isListed(s)) return;
     const p = s.parent || '';
     if (!byParent.has(p)) byParent.set(p, []);
     byParent.get(p).push(i);

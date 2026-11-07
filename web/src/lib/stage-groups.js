@@ -10,6 +10,12 @@ const rank = (name) => {
   return 2;
 };
 
+// A boss's single attacks (stages with a `parent`) are hidden for now: only the full boss fights are listed. Their
+// data stays in the scenario files and they still play by id; set this true to list them again (a drawer under their boss).
+export const SHOW_SINGLE_ATTACKS = false;
+// is this stage listed (stage list, room picker, leaderboards, the map index's counts)?
+export const isListed = (s) => !!s && (!s.parent || SHOW_SINGLE_ATTACKS);
+
 // scenarios: the file's list. Returns [{ name, items: [index, ...] }] for the top-level stages (no `parent`).
 export function groupStages(scenarios) {
   const parts = [];

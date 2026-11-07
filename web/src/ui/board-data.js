@@ -9,7 +9,7 @@ import { fetchJson } from '../lib/fetch.js';
 import { cleanText } from '../lib/room-rules.js';
 import { isMapName } from '../lib/paths.js';
 import { isSteamId, isAvatarUrl } from '../lib/steam.js';
-import { groupStages } from '../lib/stage-groups.js';
+import { groupStages, isListed } from '../lib/stage-groups.js';
 import { loadScenarios } from '../world/assets.js';
 
 const CACHE_MS = 20000;
@@ -106,7 +106,7 @@ export function mapStages(map) {
     stageCache.set(map, loadScenarios(map).then((f) => {
       const list = Array.isArray(f?.scenarios) ? f.scenarios : [];
       const kids = new Map();
-      for (const s of list) if (s?.parent) { if (!kids.has(s.parent)) kids.set(s.parent, []); kids.get(s.parent).push(s); }
+      for (const s of list) if (s?.parent && isListed(s)) { if (!kids.has(s.parent)) kids.set(s.parent, []); kids.get(s.parent).push(s); }
       const one = (s, part) => ({ id: String(s.id).slice(0, 80), name: cleanText(s.name, 60) || String(s.id), endless: !!s.endless, part });
       return groupStages(list).map((g) => ({
         name: cleanText(g.name, 40) || 'Stages',
