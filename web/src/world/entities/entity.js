@@ -109,8 +109,8 @@ export class Entity {
     return this.placedSolid;
   }
 
-  fireOutput(output, activator, param) {
-    this.engine.fireOutput(this, output, activator, param);
+  fireOutput(output, activator, param, caller) {
+    this.engine.fireOutput(this, output, activator, param, caller ?? this);
   }
 }
 

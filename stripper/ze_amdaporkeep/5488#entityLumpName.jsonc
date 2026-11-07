@@ -1,0 +1,41 @@
+{
+	// Extra red blue lasers: Omega-F and Omega-M fire 3 more each at the end
+	"x-lasers": {
+		"name": "6 more red and blue lasers",
+		"summary": "Omega-F and Omega-M fire 3 more random lasers each at the end",
+		"detail": "Laser Omega's ending: each of Omega-F (red) and Omega-M (blue) fires 3 random lasers (its case's PickRandomShuffle at +1.25, +2.05 and +3.3 s after its relay) and a vertical one (+4.45 s), then the platform rises at +5.5 s. This edit adds 3 more picks per colour between them (+1.65, +2.65 and +3.85 s), 6 lasers more in all, each from the same 5 heights and tilts, before the vertical one and the platform. The colour rules are the map's: the first colour that touches you is yours, the other kills you. Ours, not GFL's, and off unless you turn it on.",
+		"off": true
+	},
+	"modify":
+	{
+		"match":
+		{
+			"targetname": "[PR#]Laser_Omega_F_Ending_Relay"
+		},
+		"insert":
+		{
+			"io":
+			[
+				{ "outputname": "OnTrigger", "targetname": "[PR#]Laser_Omega_F_case", "inputname": "PickRandomShuffle", "delay": 1.65, "timestofire": 1 },
+				{ "outputname": "OnTrigger", "targetname": "[PR#]Laser_Omega_F_case", "inputname": "PickRandomShuffle", "delay": 2.65, "timestofire": 1 },
+				{ "outputname": "OnTrigger", "targetname": "[PR#]Laser_Omega_F_case", "inputname": "PickRandomShuffle", "delay": 3.85, "timestofire": 1 }
+			]
+		}
+	},
+	"modify":
+	{
+		"match":
+		{
+			"targetname": "[PR#]Laser_Omega_M_Ending_Relay"
+		},
+		"insert":
+		{
+			"io":
+			[
+				{ "outputname": "OnTrigger", "targetname": "[PR#]Laser_Omega_M_case", "inputname": "PickRandomShuffle", "delay": 1.65, "timestofire": 1 },
+				{ "outputname": "OnTrigger", "targetname": "[PR#]Laser_Omega_M_case", "inputname": "PickRandomShuffle", "delay": 2.65, "timestofire": 1 },
+				{ "outputname": "OnTrigger", "targetname": "[PR#]Laser_Omega_M_case", "inputname": "PickRandomShuffle", "delay": 3.85, "timestofire": 1 }
+			]
+		}
+	}
+}

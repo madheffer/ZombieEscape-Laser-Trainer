@@ -302,6 +302,13 @@ static class SoundBake
         try
         {
             var res = loader.LoadFile(path + "_c");
+            // CS2's file system ignores case and the resource compiler stores paths lower-cased: ze_amdaporkeep's events
+            // name "sounds/AmdaporKeep/Music/..." for files packed as "sounds/amdaporkeep/music/..."
+            if (res?.DataBlock is not Sound && path != path.ToLowerInvariant())
+            {
+                var lower = loader.LoadFile(path.ToLowerInvariant() + "_c");
+                if (lower?.DataBlock is Sound) { res = lower; path = path.ToLowerInvariant(); }
+            }
             // an event may name the source file (ze_offliner: "sounds/ambient/waterrun.wav", "sounds/contest/torpedo.mp3");
             // the resource compiler writes it as <name>.vsnd_c, which is what the game loads
             if (res?.DataBlock is not Sound && !path.EndsWith(".vsnd", StringComparison.OrdinalIgnoreCase))

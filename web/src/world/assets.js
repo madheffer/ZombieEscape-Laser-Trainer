@@ -197,13 +197,13 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
 
 // Put a loaded map (S.map) on the entities a run plays: the map's edits with `choice`'s left out and its counts
 // picked (lib/stripper.js resolveChoice): its entities and items swap to that variant, built once (the same steps as
-// above: the edits, then the skybox) and kept for the next run. -> { off, counts } as applied (a replay records them)
+// above: the edits, then the skybox) and kept for the next run. -> { off, counts, on } as applied (a replay records them)
 export function mapEdits(map, choice) {
   const e = map?.edits;
-  if (!e) return { off: [], counts: {} };
-  const { off, counts, key } = resolveChoice(e.list, choice);
+  if (!e) return { off: [], counts: {}, on: [] };
+  const { off, counts, on, key } = resolveChoice(e.list, choice);
   if (!e.variants.has(key)) {
-    const entities = applyStripper(structuredClone(e.raw), e.stripper, map.name, { off, counts });
+    const entities = applyStripper(structuredClone(e.raw), e.stripper, map.name, { off, counts, on });
     mergeSkybox(entities, e.skybox);
     e.variants.set(key, { entities, items: mapItems(entities, e.entwatch) });
   }
@@ -211,7 +211,7 @@ export function mapEdits(map, choice) {
   map.entities = v.entities;
   map.items = v.items;
   e.off = key;
-  return { off, counts };
+  return { off, counts, on };
 }
 
 // water.json -> { textures: { <vtex path>: url }, frames: { <vtex path>: slices }, cubes } (null without one). File names only

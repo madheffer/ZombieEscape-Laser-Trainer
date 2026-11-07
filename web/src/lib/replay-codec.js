@@ -165,6 +165,7 @@ export function cleanMeta(m) {
       ultimaItem: ['hold', 'auto'].includes(rules.ultimaItem) ? rules.ultimaItem : 'none', ultimaAt: num(rules.ultimaAt, 0, 300, 0),
       // the map edits the run turned off and the counts it picked (lib/stripper.js): the server's check loads the map the same way
       stripperOff: cleanEditsOff(rules.stripperOff), stripperCount: cleanCounts(rules.stripperCount),
+      stripperOn: cleanEditsOff(rules.stripperOn), // the off-by-default edits it turned on
     },
   };
 }

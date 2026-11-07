@@ -1,10 +1,11 @@
 // Settings > Game: "Map edits". GFL's servers change some maps' entities as they load (StripperCS2), and we add a few
 // edits players asked for that no server ships (stripper/<map>/ in this repo; lib/stripper.js, BAKING.md "GFL's
-// entity edits"). Every edit plays by default. Here each can be turned off per map, solo: one switch per edit with a
+// entity edits"). Every edit plays by default, except ours marked off ("x-lasers" off: true: turned on here). Here each
+// can be switched per map, solo: one switch per edit with a
 // one-line summary, a number for an edit that takes one (cosmo's lasers per wave), and an (i) for the long version
 // (maps/index.json via tools/index-maps.mjs). A co-op round always plays all of them at their defaults
-// (app/rules.js stripperChoice). The choice is settings.stripperOff = { map: [edit ids off] } and
-// settings.stripperCount = { map: { id: n } }; it applies from the next stage start (app/session.js ->
+// (app/rules.js stripperChoice). The choice is settings.stripperOff = { map: [edit ids off] },
+// settings.stripperOn = { map: [off-by-default ids on] } and settings.stripperCount = { map: { id: n } }; it applies from the next stage start (app/session.js ->
 // world/assets.js mapEdits). Map text goes in through textContent only.
 import { el } from './stage-card.js';
 import { settings, saveSettings } from '../app/settings.js';
@@ -46,6 +47,13 @@ function setOff(map, id, off) {
   setFor('stripperOff', map, [...now].sort(), (l) => !l.length);
 }
 
+// an off-by-default edit's switch: settings.stripperOn
+function setOn(map, id, on) {
+  const now = new Set(settings.stripperOn[map] || []);
+  if (on) now.add(id); else now.delete(id);
+  setFor('stripperOn', map, [...now].sort(), (l) => !l.length);
+}
+
 function setCount(map, id, n, def) {
   const now = { ...(settings.stripperCount[map] || {}) };
   if (n === def) delete now[id]; else now[id] = n;
@@ -71,7 +79,7 @@ function cleanEdit(e) {
   const c = e.count;
   const count = c && Number.isInteger(c.min) && Number.isInteger(c.max) && Number.isInteger(c.default) && c.min >= 1 && c.max <= 16 && c.min <= c.default && c.default <= c.max
     ? { min: c.min, max: c.max, default: c.default, label: String(c.label || 'Count').slice(0, 40) } : null;
-  return { id: e.id, name: String(e.name || e.id), summary: String(e.summary || ''), detail: String(e.detail || ''), gfl: String(e.gfl || ''), ours: e.source === 'ours', count };
+  return { id: e.id, name: String(e.name || e.id), summary: String(e.summary || ''), detail: String(e.detail || ''), gfl: String(e.gfl || ''), ours: e.source === 'ours', count, off: e.off === true };
 }
 
 // maps: S.mapIndex (index.json entries); the card goes into `column`, only if a map has edits
@@ -89,8 +97,8 @@ export function installStripperSettings(column, maps) {
       const row = el('div', 'se-row');
       const label = el('label', 'chk');
       const box = el('input', '', { type: 'checkbox' });
-      box.checked = !(settings.stripperOff[m.name] || []).includes(edit.id);
-      box.addEventListener('input', () => setOff(m.name, edit.id, !box.checked));
+      box.checked = edit.off ? (settings.stripperOn[m.name] || []).includes(edit.id) : !(settings.stripperOff[m.name] || []).includes(edit.id);
+      box.addEventListener('input', () => (edit.off ? setOn(m.name, edit.id, box.checked) : setOff(m.name, edit.id, !box.checked)));
       const text = el('span', '', {}, edit.name);
       if (edit.summary) text.append(el('small', '', {}, edit.summary));
       label.append(box, text);

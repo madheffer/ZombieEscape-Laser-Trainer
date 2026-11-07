@@ -14,6 +14,7 @@ import { startScenario, hurtPlayer, healPlayer, finish, stageTime, landing } fro
 import { startIfDue, mapRuns, winDue, sentOut } from '../world/run-engine.js';
 import { caughtBy } from '../world/caught.js';
 import { bossHudHtml } from '../ui/hud.js';
+import { playerMark } from './marks.js';
 import { formatTime, plural } from '../lib/format.js';
 import { getRecord } from './records.js';
 import { cameraPosition } from './camera.js';
@@ -349,5 +350,6 @@ export function updateHud() {
     spectate: run.spectating ? S.mp?.spectateLabel() : '',
     weapon: G.vm.weapon, gun: G.vm.gunName, held: G.vm.held?.name, clip: G.vm.clip, reserve: G.vm.reserve, reloading: G.vm.reloading,
     bossHtml: bossHudHtml(bosses),
+    mark: run.spectating ? null : playerMark(scenario, S.engine), // a stage's `marks` (app/marks.js)
   });
 }

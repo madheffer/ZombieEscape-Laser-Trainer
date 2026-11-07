@@ -242,9 +242,11 @@ export class EntityEngine {
       // spawned entities that are themselves timers/relays etc. get their spawn behaviour above
       if (e.cls === 'logic_auto') e.fireOutput('OnMapSpawn', activator);
     }
-    // point_template's own output fires for its ForceSpawn; a maker spawning through it fires the maker's
+    // the point_template's own OnEntitySpawned fires for every instance, a maker's spawn too, and then the maker's.
+    // Maps rely on the template's for maker spawns: ze_amdaporkeep's Laser_Omega_Temp opens its laser's mover there
+    // (Laser_Omega_Maker), ze_alien_shooter's helicopter sound, ze_dreamin's freezer effect, ze_visualizer's heal effect
+    tpl.fireOutput('OnEntitySpawned', activator);
     if (maker) maker.fireOutput('OnEntitySpawned', activator);
-    else tpl.fireOutput('OnEntitySpawned', activator);
     return created;
   }
 
@@ -344,7 +346,9 @@ export class EntityEngine {
 
   // ---- I/O
 
-  fireOutput(e, output, activator, param) {
+  // caller: who the targets' !caller is: the firing entity, except where CS2 passes its input's caller on
+  // (math_counter's OnGetValue answers the entity that asked: ze_amdaporkeep's Boss_HP_Case)
+  fireOutput(e, output, activator, param, caller = e) {
     const low = output.toLowerCase();
     // Boss HP in ZE maps grows per human who touches an "add HP" trigger. You are one player standing in
     // for `humans` of them, so those adds repeat once per simulated human. Only OnStartTouch fires per toucher
@@ -374,8 +378,8 @@ export class EntityEngine {
         continue;
       }
       const reps = isAdd ? Math.min(MAX_HUMANS, Math.max(1, this.humans | 0)) : 1;
-      for (let r = 1; r < reps; r++) this.queue.push({ t: this.time + (c.delay || 0), o: this.order++, target: c.target, input: c.input, param: p, activator, caller: e });
-      this.queue.push({ t: this.time + (c.delay || 0), o: this.order++, target: c.target, input: c.input, param: p, activator, caller: e });
+      for (let r = 1; r < reps; r++) this.queue.push({ t: this.time + (c.delay || 0), o: this.order++, target: c.target, input: c.input, param: p, activator, caller });
+      this.queue.push({ t: this.time + (c.delay || 0), o: this.order++, target: c.target, input: c.input, param: p, activator, caller });
       if (c.times > 0 && --c.times === 0) { e.io.splice(i, 1); i--; }
     }
   }

@@ -20,10 +20,10 @@ export function rule(key) {
 // server does), a replay's own, solo your settings' for the map (settings.stripperOff / stripperCount).
 // -> { off: [ids], counts: { id: n } } (lib/stripper.js cleanChoice); a round plays every edit at its default count
 export function stripperChoice(map) {
-  if (S.mp) return { off: [], counts: {} };
-  if (S.replay) return { off: S.replay.meta.rules.stripperOff || [], counts: S.replay.meta.rules.stripperCount || {} };
+  if (S.mp) return { off: [], counts: {}, on: [] };
+  if (S.replay) { const r = S.replay.meta.rules; return { off: r.stripperOff || [], counts: r.stripperCount || {}, on: r.stripperOn || [] }; }
   const own = (o) => (Object.hasOwn(o, map) ? o[map] : undefined);
-  return { off: own(settings.stripperOff) || [], counts: own(settings.stripperCount) || {} };
+  return { off: own(settings.stripperOff) || [], counts: own(settings.stripperCount) || {}, on: own(settings.stripperOn) || [] };
 }
 
 // the real players in this run: a round's roster, else you

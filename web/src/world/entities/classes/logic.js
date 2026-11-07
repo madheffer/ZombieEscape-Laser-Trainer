@@ -110,7 +110,7 @@ register('math_counter', {
   spawn(e) {
     e.state.min = num(e.kv.min); e.state.max = num(e.kv.max); e.state.v = num(e.kv.startvalue);
   },
-  input(e, inp, p, act) {
+  input(e, inp, p, act, caller) {
     const s = e.state;
     const set = (v, fire = true) => {
       if (!e.enabled) return;
@@ -133,7 +133,8 @@ register('math_counter', {
       case 'divide': if (num(p)) set(s.v / num(p)); return true;
       case 'setvalue': set(num(p)); return true;
       case 'setvaluenofire': set(num(p), false); return true;
-      case 'getvalue': e.fireOutput('OnGetValue', act, s.v); return true;
+      // CMathCounter::InputGetValue fires OnGetValue with the input's caller, so !caller is whoever asked
+      case 'getvalue': e.fireOutput('OnGetValue', act, s.v, caller || e); return true;
       case 'sethitmax': s.max = num(p); return true;
       case 'sethitmin': s.min = num(p); return true;
       case 'setmaxvalue': s.max = num(p); return true;

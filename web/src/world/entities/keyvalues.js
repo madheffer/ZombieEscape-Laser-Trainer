@@ -161,6 +161,7 @@ export function playerInput(engine, q, who = engine.playerEnt) {
     case 'setdamagefilter': me.damageFilter = q.param ? String(q.param) : ''; P?.setDamageFilter(stripName(q.param)); return;
     case 'addcontext': (me.contexts ||= new Set()).add(context()); return;
     case 'removecontext': me.contexts?.delete(context()); return;
+    case 'clearcontext': me.contexts?.clear(); return;
     case 'setfogcontroller': setPlayerFog(engine, q.param); return; // which fog you see (classes/fog.js)
     // CS2Fixes takes over IgniteLifetime on a pawn (any input starting "IgniteL"): burn.js. Plain Ignite is CS2's own.
     case 'ignitelifetime': ignitePlayer(engine, parseFloat(q.param) || 0, q.caller); return;

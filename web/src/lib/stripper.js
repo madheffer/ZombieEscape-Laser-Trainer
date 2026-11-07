@@ -76,8 +76,9 @@ function valueEnd(s, i) {
 }
 
 // ---- our own configs (stripper/<map>/ in this repo, GFL's format plus two extension keys, tools/stripper.mjs):
-//   "x-lasers": { name, summary, detail, count: { default, min, max, label } }  after an edit's comment: the
-//                settings' words for it, and a number the player picks (1-16)
+//   "x-lasers": { name, summary, detail, count: { default, min, max, label }, off }  after an edit's comment: the
+//                settings' words for it, a number the player picks (1-16), and `off: true` for an edit that only
+//                plays when a player turns it on (a choice's `on` list; a co-op round and the tools leave it out)
 //   "repeat": "count"  on an io entry an edit inserts: that output goes in `count` times (the player's number)
 // StripperCS2 would ignore the key and insert the output once.
 const META_KEY = 'x-lasers';
@@ -92,6 +93,7 @@ function cleanEditMeta(v) {
     const min = int(c.min, ...COUNT_CAP, COUNT_CAP[0]), max = int(c.max, min, COUNT_CAP[1], COUNT_CAP[1]);
     out.count = { min, max, default: int(c.default, min, max, min), label: str(c.label, 40) || 'Count' };
   }
+  if (v.off === true) out.off = true;
   return out;
 }
 
@@ -256,27 +258,32 @@ export function cleanCounts(v) {
   return out;
 }
 
-// What a run plays: { off: [ids], counts: { id: n } } from either form (a plain array is the off list)
+// What a run plays: { off: [ids], counts: { id: n }, on: [ids] } from either form (a plain array is the off list).
+// `on`: edits that are off unless turned on ("x-lasers" off: true)
 export function cleanChoice(v) {
-  if (Array.isArray(v)) return { off: cleanEditsOff(v), counts: {} };
-  return { off: cleanEditsOff(v?.off), counts: cleanCounts(v?.counts) };
+  if (Array.isArray(v)) return { off: cleanEditsOff(v), counts: {}, on: [] };
+  return { off: cleanEditsOff(v?.off), counts: cleanCounts(v?.counts), on: cleanEditsOff(v?.on) };
 }
+// does an edit play under a choice: not turned off, and an off-by-default one only when turned on
+const plays = (e, off, on) => !off.includes(e.id) && (!cleanEditMeta(e.meta)?.off || on.includes(e.id));
 // A choice against the map's own edits (stripperEdits): unknown ids dropped, counts clamped to their edit's range and
-// left out at its default, so the same play has one form. -> { off, counts, key } (key: '' = every edit, defaults;
-// the variant caches on the client and the server use it, and a replay records off / counts)
+// left out at its default, so the same play has one form. -> { off, counts, on, key } (key: '' = the defaults; the
+// variant caches on the client and the server use it, and a replay records off / counts / on)
 export function resolveChoice(edits, choice) {
   const c = cleanChoice(choice);
   const byId = new Map((edits || []).map((e) => [e.id, e]));
   const off = c.off.filter((id) => byId.has(id));
+  const on = c.on.filter((id) => byId.get(id)?.meta?.off && !off.includes(id));
   const counts = {};
   for (const [id, n] of Object.entries(c.counts)) {
-    const r = byId.get(id)?.meta?.count;
-    if (!r || off.includes(id)) continue;
+    const e = byId.get(id), r = e?.meta?.count;
+    if (!r || !plays(e, off, on)) continue;
     const v = int(n, r.min, r.max, r.default);
     if (v !== r.default) counts[id] = v;
   }
-  const key = [off.join(','), Object.entries(counts).map(([id, n]) => `${id}=${n}`).join(',')].join(';');
-  return { off, counts, key: key === ';' ? '' : key };
+  let key = [off.join(','), Object.entries(counts).map(([id, n]) => `${id}=${n}`).join(',')].join(';');
+  if (on.length) key += `;+${on.join(',')}`;
+  return { off, counts, on, key: key === ';' ? '' : key };
 }
 
 // an edit's actions with its "repeat": "count" outputs put in n times (a copy; the edit's own data is never changed)
@@ -298,11 +305,11 @@ function withCount(actions, n) {
 
 // Apply a map's stripper.json ({ files: [{ world, lump, edits: [{ id, note, actions: {filter, add, modify} }] }] },
 // tools/stripper.mjs) to its entities.json ({ lumps: { name: [{kv, io}] } }), in place; returns the entities.
-// choice: the edits to leave out and the counts picked (cleanChoice; a plain array = the off list); the others
-// apply as GFL's server applies the whole file, an edit with a count at its default unless one was picked.
+// choice: the edits to leave out, the counts picked and the off-by-default edits turned on (cleanChoice; a plain array =
+// the off list); the others apply as GFL's server applies the whole file, an edit with a count at its default unless one
+// was picked.
 export function applyStripper(entities, stripper, map, choice = []) {
-  const { off, counts } = cleanChoice(choice);
-  const skip = new Set(off);
+  const { off, counts, on } = cleanChoice(choice);
   const files = Array.isArray(stripper?.files) ? stripper.files : [];
   const lumps = entities?.lumps;
   if (!files.length || !lumps || typeof lumps !== 'object') return entities;
@@ -313,7 +320,7 @@ export function applyStripper(entities, stripper, map, choice = []) {
     if (!key || !Array.isArray(lumps[key])) continue;
     const actions = { filter: [], add: [], modify: [] };
     for (const e of fileEdits(f)) {
-      if (skip.has(e.id)) continue;
+      if (!plays(e, off, on)) continue;
       const c = cleanEditMeta(e.meta)?.count;
       const acts = c ? withCount(e.actions, int(counts[e.id], c.min, c.max, c.default)) : e.actions;
       for (const k of Object.keys(actions)) if (Array.isArray(acts[k])) actions[k].push(...acts[k]);

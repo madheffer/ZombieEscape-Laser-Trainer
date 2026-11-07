@@ -29,6 +29,7 @@ make that from your own CS2 install. You need:
 | ze_the_shifting_pool | [3554883009](https://steamcommunity.com/sharedfiles/filedetails/?id=3554883009) |
 | ze_rush_b | [3588414134](https://steamcommunity.com/sharedfiles/filedetails/?id=3588414134) |
 | ze_ffvii_cosmo_canyon_v5_p | [3714323840](https://steamcommunity.com/sharedfiles/filedetails/?id=3714323840) |
+| ze_amdaporkeep | [3677369274](https://steamcommunity.com/sharedfiles/filedetails/?id=3677369274) |
 
 (Each `web/public/scenarios/<map>.json` names its workshop id; that list is where `--scenarios` reads them.)
 

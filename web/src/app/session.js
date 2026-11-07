@@ -203,7 +203,7 @@ export function startScenario(i, mode = 'normal') {
     run.rec = new ReplayRecorder({
       seed: run.seed, map: map.name, mapVersion: map.version || '', stage: scenario.id, mode: run.mode, countdown: run.startAt,
       weapon: scenario.weapon || 'knife', gun: DEFAULT_GUN,
-      rules: { humans: rule('humans'), bossHp: rule('bossHp'), autoFire: rule('autoFire'), perfectTeam: rule('perfectTeam'), fallDamage: rule('fallDamage'), healItem: !!settings.healItem, ultimaItem: settings.ultimaItem, ultimaAt: settings.ultimaAt, stripperOff: runEdits.off, stripperCount: runEdits.counts },
+      rules: { humans: rule('humans'), bossHp: rule('bossHp'), autoFire: rule('autoFire'), perfectTeam: rule('perfectTeam'), fallDamage: rule('fallDamage'), healItem: !!settings.healItem, ultimaItem: settings.ultimaItem, ultimaAt: settings.ultimaAt, stripperOff: runEdits.off, stripperCount: runEdits.counts, stripperOn: runEdits.on },
     });
   }
   // every stage starts with the PP-Bizon (a replay: the gun its run started with, then its buys: app/replay-play.js)

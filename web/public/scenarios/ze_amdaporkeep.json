@@ -1,0 +1,79 @@
+{
+  "map": "ze_amdaporkeep",
+  "title": "ze_amdaporkeep",
+  "workshop": "3677369274",
+  "workshopUpdated": "2026-08-17",
+  "description": "Omega mode's Laser Omega: shoot Omega down through its laser waves, then run onto the platform behind it and dodge Omega-F's red and Omega-M's blue lasers.",
+  "scenarios": [
+    {
+      "id": "laser_omega",
+      "group": "Laser Omega",
+      "full": true,
+      "featured": true,
+      "name": "Laser Omega (full)",
+      "summary": "Boss lasers, then red and blue lasers",
+      "childrenTitle": "Parts",
+      "description": "Temp_Laser_Omega.FireUser1 (Omega_Trigger, 34.5 s after the humans reach the hall) spawns Omega at the end of the hall. Laser_Omega_Hp starts at 20 and Boss_HP_Case adds 90 per human; every bullet on Laser_Omega_Hitobx takes 1 off. You start past the shield, so the outputs of Laser_Omega_Enable_Trigger are fired as the team crossing it 5 s in, once Omega has appeared and taken its HP (it is immune, Filter_Nada, until 1.5 s after the crossing): Omega's shield goes up behind you and Laser_Omega_Timer starts 2.5 s after the crossing: every 0.9-1.2 s a killing laser (Laser_Omega_Hurt, 999999) comes down the hall at one of 8 heights / tilts (Laser_Omega_case). At 0 HP Laser_Omega_Ending spawns Omega-F (red) and Omega-M (blue) at x 2244, and 13 s later each fires 3 random lasers (Laser_Omega_F_case / _M_case PickRandomShuffle at +1.25, +2.05, +3.3 s) and a vertical one (+4.45 s) toward the platform behind Omega. A laser does no damage itself: a red one gives you the VirusR context, a blue one VirusB, and 0.02 s later tests the other colour's filter. So the first colour that touches you is yours, and the other colour kills you (Player_NukeHurt, 2500). At +18.5 s the platform (Omega_Ending_Platform_Train) rises; Level_Ending_Omega at the top wins.",
+      "spawn": { "origin": [1900, 0, 257], "yaw": 0 },
+      "setup": [{ "target": "[PR#]Level_Template_Omega", "input": "ForceSpawn" }],
+      "start": [
+        { "target": "[PR#]Temp_Laser_Omega", "input": "FireUser1" },
+        { "target": "[PR#]Laser_Omega_Hitobx", "input": "SetDamageFilter", "param": "[PR#]Filter_Team_Human", "delay": 6.5 },
+        { "target": "[PR#]Laser_Omega_Timer", "input": "Enable", "delay": 7.5 },
+        { "target": "[PR#]Laser_Omega_Shield_Particle", "input": "Start", "delay": 7.5 }
+      ],
+      "bosses": [{ "target": "[PR#]Laser_Omega_Hitobx", "name": "Omega", "counter": "[PR#]Laser_Omega_Hp", "counterMode": "hits" }],
+      "music": [
+        { "target": "[PR#]Omega_Sound_Case", "input": "PickRandom" },
+        { "target": "[PR#]Music_Omega_4", "input": "StartSound", "delay": 0.1 }
+      ],
+      "win": { "target": "[PR#]Map_Winner_Relay", "input": "Trigger" },
+      "hazards": {
+        "Laser_Omega_Hurt": "Omega's laser",
+        "Player_NukeHurt": "the other colour's laser"
+      }
+    },
+    {
+      "id": "laser_omega_boss",
+      "group": "Laser Omega",
+      "name": "Omega's lasers",
+      "summary": "Shoot Omega down through its lasers",
+      "description": "The boss part alone: Temp_Laser_Omega.FireUser1, Omega's laser waves every 0.9-1.2 s at 8 heights / tilts (jump or crouch them), 20 + 90 HP per human. Win when Laser_Omega_Hp empties (Laser_Omega_Ending.FireUser4).",
+      "spawn": { "origin": [1900, 0, 257], "yaw": 0 },
+      "setup": [{ "target": "[PR#]Level_Template_Omega", "input": "ForceSpawn" }],
+      "start": [
+        { "target": "[PR#]Temp_Laser_Omega", "input": "FireUser1" },
+        { "target": "[PR#]Laser_Omega_Hitobx", "input": "SetDamageFilter", "param": "[PR#]Filter_Team_Human", "delay": 6.5 },
+        { "target": "[PR#]Laser_Omega_Timer", "input": "Enable", "delay": 7.5 },
+        { "target": "[PR#]Laser_Omega_Shield_Particle", "input": "Start", "delay": 7.5 }
+      ],
+      "bosses": [{ "target": "[PR#]Laser_Omega_Hitobx", "name": "Omega", "counter": "[PR#]Laser_Omega_Hp", "counterMode": "hits" }],
+      "music": [
+        { "target": "[PR#]Omega_Sound_Case", "input": "PickRandom" },
+        { "target": "[PR#]Music_Omega_4", "input": "StartSound", "delay": 0.1 }
+      ],
+      "win": { "target": "[PR#]Laser_Omega_Ending", "input": "FireUser4" },
+      "hazards": { "Laser_Omega_Hurt": "Omega's laser" }
+    },
+    {
+      "id": "red_blue_lasers",
+      "group": "Laser Omega",
+      "name": "Red and blue lasers",
+      "summary": "First colour to hit you is yours",
+      "description": "Omega is killed 5.5 s into a silent 14 s replay (Laser_Omega_Hp set to 0, the map's own OnHitMin); you start on the platform behind where Omega stood, facing back down the hall, 1.5 s before Omega-F and Omega-M appear. 13 s after the death Omega-F (red) and Omega-M (blue) each fire 3 random lasers and a vertical one. The first colour that touches you is yours (VirusR / VirusB context); touching the other colour after that kills you. Then the platform rises to Level_Ending_Omega.",
+      "fastForward": 14,
+      "spawn": { "origin": [4992, 0, 260], "yaw": 180 },
+      "setup": [{ "target": "[PR#]Level_Template_Omega", "input": "ForceSpawn" }],
+      "start": [
+        { "target": "[PR#]Temp_Laser_Omega", "input": "FireUser1" },
+        { "target": "[PR#]Laser_Omega_Hp", "input": "SetValue", "param": "0", "delay": 5.5 }
+      ],
+      "music": [
+        { "target": "[PR#]Omega_Sound_Case", "input": "PickRandom" },
+        { "target": "[PR#]Music_Omega_4", "input": "StartSound", "delay": 0.1 }
+      ],
+      "win": { "target": "[PR#]Map_Winner_Relay", "input": "Trigger" },
+      "hazards": { "Player_NukeHurt": "the other colour's laser" }
+    }
+  ]
+}

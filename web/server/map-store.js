@@ -65,15 +65,15 @@ export function mapStore(dir) {
       // the map's EntWatch items, as the browser reads them (world/items.js): a round's holders get theirs
       const physics = physicsOk && physicsBin ? physicsBin.buffer.slice(physicsBin.byteOffset, physicsBin.byteOffset + physicsBin.byteLength) : null;
       const assets = { map, entities, hulls, bounds, animations, soundDurations: soundDurations(soundevents), bvh: new TriangleBVH(tris), fx, physics, items: mapItems(entities, entwatch) };
-      // the map with a solo run's choice of edits (rules.stripperOff / stripperCount, resolved as the client resolves
+      // the map with a solo run's choice of edits (rules.stripperOff / stripperCount / stripperOn, resolved as the client resolves
       // it: world/assets.js mapEdits): its own entities and items, the rest shared
       const variants = new Map();
       const edits = stripperEdits(stripper, map);
       if (raw) assets.variant = (choice) => {
-        const { off, counts, key } = resolveChoice(edits, choice);
+        const { off, counts, on, key } = resolveChoice(edits, choice);
         if (!key) return assets;
         if (!variants.has(key)) {
-          const ents = applyStripper(structuredClone(raw), stripper, map, { off, counts });
+          const ents = applyStripper(structuredClone(raw), stripper, map, { off, counts, on });
           variants.set(key, { ...assets, entities: ents, items: mapItems(ents, entwatch) });
           while (variants.size > KEEP) variants.delete(variants.keys().next().value);
         }

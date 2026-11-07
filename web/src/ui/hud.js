@@ -40,6 +40,7 @@ export class Hud {
       <div class="hud-boss"></div>
       <div class="hud-spec"></div>
       <div class="hud-countdown" aria-live="polite"></div>
+      <div class="hud-mark" aria-live="polite"></div>
       <div class="hud-money"><span class="money-digits">$0</span>${icon(ICONS.cart, 'money-cart')}</div>
       <div class="hud-ha">
         <div class="hud-ha-half left">
@@ -76,7 +77,7 @@ export class Hud {
     root.dataset.team = team;
     const q = (s) => root.querySelector(s);
     this.el = {
-      title: q('.hud-title'), timer: q('.hud-timer'), sub: q('.hud-sub'), boss: q('.hud-boss'), spec: q('.hud-spec'), countdown: q('.hud-countdown'),
+      title: q('.hud-title'), timer: q('.hud-timer'), sub: q('.hud-sub'), boss: q('.hud-boss'), spec: q('.hud-spec'), countdown: q('.hud-countdown'), mark: q('.hud-mark'),
       money: q('.money-digits'), ha: q('.hud-ha'), hp: q('.hud-ha-big.hp'), hpBar: q('.hp-bar i'),
       armor: q('.hud-ha-armor'), armorLabel: q('.hud-ha-armor-label'), armorIcon: q('.armor-icon'),
       wpn: q('.hud-wpn-main'), modeIcon: q('.mode-icon'), clip: q('.hud-ha-big.clip'), clipBar: q('.clip-bar i'), reserve: q('.hud-wpn-reserve'),
@@ -139,6 +140,14 @@ export class Hud {
       e.wpn.classList.toggle('reloading', !!v.reloading);
     }
     if (e.boss.innerHTML !== (v.bossHtml || '')) e.boss.innerHTML = v.bossHtml || '';
+    // what the map has made you (app/marks.js: a stage's `marks`), fading in above your health
+    const mk = v.mark ? `${v.mark.text}|${v.mark.color}` : '';
+    if (this.last.mark !== mk) {
+      this.last.mark = mk;
+      e.mark.textContent = v.mark?.text || '';
+      e.mark.style.color = v.mark?.color || '';
+      if (mk) replayClass(e.mark, 'shown');
+    }
   }
 }
 

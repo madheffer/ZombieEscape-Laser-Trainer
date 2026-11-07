@@ -48,6 +48,8 @@ export const DEFAULTS = {
   stripperOff: {},
   // and the numbers picked for edits that take one, per map: { <map>: { <edit id>: n } } (cosmo's Ifrit lasers per wave)
   stripperCount: {},
+  // our edits that are off unless turned on ("x-lasers" off: true), turned on per map: { <map>: [edit ids] }
+  stripperOn: {},
 };
 
 // Allowed range per numeric setting; a saved value outside it is clamped (the menu can't produce one).
@@ -76,6 +78,7 @@ export function sanitizeSettings(saved) {
       else if (typeof d === 'string' && CHOICES[k]?.includes(v)) out[k] = v;
       else if (k === 'stripperOff') out[k] = perMap(v, cleanEditsOff, (l) => l.length);
       else if (k === 'stripperCount') out[k] = perMap(v, cleanCounts, (c) => Object.keys(c).length);
+      else if (k === 'stripperOn') out[k] = perMap(v, cleanEditsOff, (l) => l.length);
     } else if (typeof v === 'boolean' || (typeof v === 'number' && Number.isFinite(v)) || (typeof v === 'string' && v.length <= 200)) {
       out[k] = v;
     }
