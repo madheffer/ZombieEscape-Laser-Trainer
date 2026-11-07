@@ -352,12 +352,13 @@ export class EffectInstance {
         }
         // CS2's GameOverlay layer (m_bOnlyRenderInEffecsGameOverlay; client.dll builds a "GameOverlay Particles" layer):
         // drawn after the scene, over it. Westersand's Chaos_Tesla lightning (tesla_beam_p1c) is one: in game its bolts
-        // show across Chaos's body although they start inside it. UNSETTLED: the layer's own pass is not traced; no depth
-        // test, after everything else, is read from that footage.
+        // show across Chaos's body although they start inside it. UNSETTLED: the layer's own pass is not traced. It is
+        // drawn last but still depth-tested: map authors set the flag on ordinary world effects (1749 renderers over 14
+        // baked maps: ze_visualizer's pipe waterfalls and trigger fountains), and with no depth test those showed
+        // through walls and floors, which they don't in game. m_bDisableZBuffering still turns the test off.
         const overlay = !!(r.p?.m_bOnlyRenderInEffecsGameOverlay ?? raw.m_bOnlyRenderInEffecsGameOverlay);
         rend.mesh.renderOrder = (overlay ? OVERLAY_ORDER : 0) + order++;
         const ctl = rend.update(col, r.p, raw, { camPos, report: (m) => this.effects.report(m) }, r.cls);
-        if (rend.mesh.material) rend.mesh.material.depthTest = !overlay;
         for (const u of ctl?.unsupported || []) this.effects.report(`${r.cls}: ${u}`);
       });
     }
