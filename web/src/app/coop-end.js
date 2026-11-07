@@ -4,6 +4,7 @@
 // everyone); everyone has "Back to room" (the room screen, where the owner picks the next stage).
 import { S, G } from './state.js';
 import { formatTime, plural } from '../lib/format.js';
+import { reportRun } from './console/run-report.js';
 
 export function showRoundEnd(round, d) {
   const me = round.me;
@@ -13,6 +14,9 @@ export function showRoundEnd(round, d) {
   const names = (ids) => ids.map((id) => (id === me ? 'You' : round.name(id))).join(' & ');
   const hitsOf = (id) => d.stats.find((s) => s.id === id)?.hits ?? 0;
   const scenario = S.scenario;
+  // the console's report (a death already had one): your part of the round
+  const mine = d.stats.find((s) => s.id === me);
+  if (S.run && S.map) reportRun(S.run, { result: d.result === 'win' && won ? 'win' : d.result === 'over' ? 'over' : 'lose', scenario, map: S.map.name, time: mine?.at ?? d.at });
   let kind, title, subtitle;
   if (d.result === 'win') {
     kind = 'win';

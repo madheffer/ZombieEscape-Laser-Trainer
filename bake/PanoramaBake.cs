@@ -86,6 +86,8 @@ static class PanoramaBake
         "panorama/images/icons/ui/sound_2.vsvg_c",
         "panorama/images/icons/ui/sound_3.vsvg_c",
         "panorama/images/icons/ui/kill.vsvg_c",
+        // the console (ui/console.js): its window, log, entry and completion list
+        "panorama/styles/gameconsole.vcss_c",
     ];
     // every buyable gun's and the spawn pistol's equipment icon (weapon select + ammo panel): icons/equipment/<vdata name without weapon_>
     static readonly string[] Files = [.. BaseFiles, .. WeaponBake.All.Select(g => $"panorama/images/icons/equipment/{g.Vdata["weapon_".Length..]}.vsvg_c")];

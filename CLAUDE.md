@@ -13,9 +13,10 @@ Read [README.md](README.md) first: the map folder format, scenarios, bosses, the
 bake/        lasers-bake (C#, NuGet ValveResourceFormat 20.1): workshop VPK -> map folder; --panorama; --stock-sounds
 web/         the game (Vite + three.js, plain ES modules, no framework)
   src/app/     state, settings, session, loop, input, bosses, endless, records, rules, coop (+ coop-end), voice (V push to talk),
-               account (Steam sign-in), replay-* (recording + playback, lib/replay-codec.js)
+               account (Steam sign-in), replay-* (recording + playback, lib/replay-codec.js),
+               console/ (` : convars, commands, completion, feeds, the end-of-run report; add with defineCvar / defineCommand)
   src/net/     coop-client.js (the co-op server socket)
-  src/ui/      menu, hud, overlay, touch (+ their css)
+  src/ui/      menu, hud, overlay, touch, console (+ their css)
   src/world/   collision, movement, render, assets, peers (teammates), entities/ (engine + classes/)
   src/audio/   audio.js, voice-* (Opus capture / playback over the co-op socket)
   src/weapons/ viewmodel.js + fp/ (vpkstuff's previewer engine, kept verbatim so fixes can flow both ways)

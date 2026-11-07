@@ -22,5 +22,11 @@ export const G = {};
 // $ and esc live in lib/dom.js; re-exported here because ui/menu.js (and others) import them from state.js
 export { $, esc } from '../lib/dom.js';
 import { $ } from '../lib/dom.js';
+import { con } from './console/output.js';
 
-export const log = (m) => { const el = $('#log'); if (el) el.textContent = (m + '\n' + el.textContent).slice(0, 4000); };
+// the menu's Log box, and the console (` : app/console/) as [Debug]
+export const log = (m) => {
+  const el = $('#log');
+  if (el) el.textContent = (m + '\n' + el.textContent).slice(0, 4000);
+  con.debug(m);
+};

@@ -78,6 +78,7 @@ export function startReports(r, send) {
 let lockedPing = null;
 const settingPing = () => Math.max(0, Math.min(500, Math.round(Number(settings.ping) || 0)));
 export const simulatedPing = () => lockedPing ?? settingPing();
+export const pingLocked = () => lockedPing != null; // a round is on: the console's c_simulated_ping can't change it
 export function lockPing() { lockedPing = settingPing(); G.room?.lockPing(true); G.applySettings?.(); }
 export function unlockPing() {
   if (lockedPing == null) return;

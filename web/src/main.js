@@ -41,6 +41,7 @@ import { ItemHud } from './ui/itemhud.js';
 import { Killfeed } from './ui/killfeed.js';
 import { installChat } from './app/chat.js';
 import { installVoice, talk } from './app/voice.js';
+import { installConsole } from './app/console/index.js';
 import { Lobby } from './ui/lobby.js';
 import { Home } from './ui/home.js';
 import { Rankings } from './ui/rankings.js';
@@ -414,6 +415,11 @@ G.pauseScreen = new PauseScreen($('#pause'), {
   },
 });
 installReplays(); // replays + the Steam account (app/replay-boot.js)
+// the console (` : app/console/): CS2's convars and commands, the debug / network log, the end-of-run report
+installConsole({
+  net, restart: () => restartRun(), openMap: (name) => { G.home.hide(); G.menu.show('maps'); openMap(name); },
+  leaveRun: () => { endRun(); G.pause(); G.menu.show(S.map ? 'stages' : 'maps'); G.menu.update(); },
+});
 
 // the home page: every way in leads to the menu (its Home button comes back)
 // Home closes the game you were in, so Play / Settings from there open the stage list and settings, not that paused

@@ -1,0 +1,74 @@
+/* CS2's console (panorama/styles/gameconsole.vcss, from lasers-bake --panorama): #Title Stratum2 Mono bold 18 uppercase,
+   letter-spacing 2, padding 3 4; #ConsoleText Stratum2 Mono 14, margin 2; #ConsoleInput black, white, 1 px #333 on top,
+   padding 4, 14 px; TextEntryAutocomplete 600 wide, max 200 tall, #3d4448, #e1e1e1, shadow #00000066 6 px; its Labels
+   #ffffff99 on #3d4448, padding 2 8, 1 px #00000066 above and below, background eased over 0.2 s.
+   The window around them (its dark panel, the drag bar, the resize grip) is this site's. */
+@font-face { font-family: 'Stratum2 Mono'; src: url('/panorama/fonts/stratum2mono-regular.otf'); font-weight: 400; font-display: swap; }
+
+.con {
+  position: fixed; z-index: 1100; left: 8vw; top: 8vh; width: min(900px, 84vw); height: min(560px, 70vh);
+  min-width: 360px; min-height: 200px;
+  display: flex; flex-direction: column; box-sizing: border-box;
+  background: rgba(20, 22, 24, 0.94); border: 1px solid #000; box-shadow: 0 0 12px rgba(0, 0, 0, 0.6);
+  color: #e1e1e1; font: 400 14px 'Stratum2 Mono', 'Arial Unicode MS', ui-monospace, monospace; letter-spacing: 0;
+}
+.con[hidden] { display: none; }
+
+.con-bar { display: flex; align-items: center; background: rgba(0, 0, 0, 0.45); cursor: move; user-select: none; }
+.con-title {
+  flex: 1; padding: 3px 4px; color: #fff; text-transform: uppercase; letter-spacing: 2px;
+  font: 700 18px 'Stratum2 Mono', 'Arial Unicode MS', monospace;
+}
+.con-x {
+  width: 28px; height: 28px; border: 0; background: none; color: #ffffff99; cursor: pointer;
+  font: 700 18px 'Stratum2 Mono', monospace; transition: color 0.2s;
+}
+.con-x:hover { color: #fff; }
+
+.con-log {
+  flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 2px 4px;
+  white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; user-select: text;
+}
+.con-log > div { margin: 0 2px; line-height: 1.35; }
+.con-log .echo { color: #fff; }
+.con-log .warn { color: #e8c547; }
+.con-log .error { color: #ff6060; }
+.con-log .net { color: #8fc6ff; }
+.con-log .debug { color: #9aa3a8; }
+.con-log .good { color: #7fdc7f; }
+.con-log .head { color: #fff; }
+.con-log .dim { color: #ffffff77; }
+
+.con-entry { position: relative; display: flex; }
+.con-input {
+  flex: 1; min-width: 0; border: 0; border-top: 1px solid #333; outline: 0; background: #000; color: #fff;
+  padding: 4px; font: 400 14px 'Stratum2 Mono', 'Arial Unicode MS', monospace; letter-spacing: 0;
+}
+.con-submit {
+  border: 0; border-top: 1px solid #333; border-left: 1px solid #333; background: #000; color: #ffffff99; cursor: pointer;
+  padding: 0 14px; font: 700 14px 'Stratum2 Mono', monospace; text-transform: uppercase; letter-spacing: 1px;
+}
+.con-submit:hover { color: #fff; }
+
+/* the completion list, under the entry (over the screen below the window when there is room, else above it) */
+.con-suggest {
+  position: absolute; left: 0; top: 100%; width: 600px; max-width: 100%; max-height: 200px; margin: 0; padding: 0;
+  list-style: none; overflow-y: auto; background: #3d4448; color: #e1e1e1; box-shadow: 0 0 6px #00000066; z-index: 1;
+}
+.con-suggest.up { top: auto; bottom: 100%; }
+.con-suggest[hidden] { display: none; }
+.con-suggest > li {
+  display: flex; gap: 12px; padding: 2px 8px; color: #ffffff99; background: #3d4448; cursor: pointer;
+  border-top: 1px solid #00000066; border-bottom: 1px solid #00000066; transition: background-color 0.2s ease-in-out;
+  white-space: nowrap; overflow: hidden;
+}
+.con-suggest > li > b { font-weight: 400; color: inherit; }
+.con-suggest > li > span { margin-left: auto; color: #ffffff66; overflow: hidden; text-overflow: ellipsis; }
+.con-suggest > li:hover { background: #4b5357; }
+.con-suggest > li.sel { background: #5a656b; color: #fff; }
+
+.con-grip { position: absolute; right: 0; bottom: 0; width: 14px; height: 14px; cursor: nwse-resize; z-index: 2; }
+.con-grip::after {
+  content: ''; position: absolute; right: 3px; bottom: 3px; width: 7px; height: 7px;
+  border-right: 2px solid #ffffff55; border-bottom: 2px solid #ffffff55;
+}

@@ -412,6 +412,40 @@ the stance files are vpkstuff's clip decode (lab `tools/previewer/extract-tp-cli
 - **Music**: csgo_music `stop_music` stops other `Music.` events; a scenario's `music` list starts the track a stage begins
   in the middle of (the map's own level template / relay inputs). `node tools/audit-sounds.mjs` lists each stage's music.
 
+## Console
+
+`` ` `` (CS2's toggleconsole key, the one left of 1 on any layout) opens and closes the console, in a run or in the
+menus. The key does nothing else: it never types, anywhere. Opening it in a run gives the mouse back (solo pauses, a
+round plays on); closing it with `` ` `` goes straight back in. CS2's look, from `panorama/styles/gameconsole.vcss`
+(`lasers-bake --panorama`): Stratum2 Mono 14, the uppercase title, the black entry, the #3d4448 completion list.
+The window can be dragged and resized; where it sits and the last 50 lines you ran are kept (`lasers.console`).
+
+- **Typing**: `name` prints a convar (`sensitivity = 2 (default 2, min 0.001, max 100)` + flags and help), `name value`
+  sets it (clamped to its range, saved, the menu's control redrawn), `;` runs several, "quotes" keep spaces. Unknown
+  names get engine2.dll's `Unknown command '%s'!`. The list shows matches as you type (names starting with it, then
+  containing it, each convar's value); Tab / Shift+Tab step through them, filling the entry as CS2's does; Tab on a
+  finished name goes on to its arguments (map names, stage ids, guns, 0 / 1). Up / Down walk the history.
+- **Convars**: `sensitivity`, `volume`, `snd_musicvolume`, `snd_voipvolume`, `r_fullscreen_gamma`, `cl_showfps`,
+  `fps_max` (0 = uncapped, else the display's refresh), `cam_idealdist`, `m_yaw` / `m_pitch` (read only),
+  `sv_autobunnyhopping`, `host_timescale`, `c_simulated_ping` (the simulated ping the lag compensation allows for: the
+  same value as Settings › Game and the room screen's slider, both redrawn and the room told; it reads the ping in
+  effect, and is locked while a round plays); this site's own `ze_hitboxes`, `ze_falldamage`,
+  `ze_minimap`, `ze_bosshp`. Cheats (flag `cheat`) are refused in a round, which plays by the room's rules.
+- **Commands**: `help` (alone: how the console works and every command and convar; `help <name>`: one), `find`, `cvarlist`, `differences`, `toggle`, `incrementvar`, `echo`, `clear`,
+  `toggleconsole`, `hideconsole`; `map <name>`, `stage [id | number] [endless]`, `retry`, `disconnect`, `kill`, `god`,
+  `thirdperson` / `firstperson`, `buy <gun>`, `getpos` (CS2's `setpos ...;setang ...` line), `status`, `ping`,
+  `stats`, `version`. Help texts are CS2's own where its binaries carry one.
+- **What it logs by itself** (`app/console/feeds.js`): `[Net]` the co-op connection, room joins / leaves, owner
+  changes, round load / go / end, a slow round trip; `[Debug]` everything `log()` writes (the map's warnings, load
+  failures), console.warn / console.error and script errors; `[Game]` each stage's load time and seed.
+- **End-of-run report** (solo at the end card, a round when you go down or at its end; `stats` prints it again):
+  time, hits, HP left, **lasers / balls / other hazards dodged** out of those that came at you, damage taken per hazard,
+  boss hits / shots / accuracy, jumps and top speed. "Dodged" is this site's own count (`app/dodges.js`): a moving,
+  damaging trigger_hurt that comes within 64 u of you and leaves without hurting you; laser / ball by its name, else
+  its shape (long and thin / about cubic). env_laser and point_hurt damage counts, their near misses don't.
+- **Adding to it**: `defineCvar` / `defineCommand` (`app/console/registry.js`) from any module; `print` / `con`
+  (`app/console/output.js`) to write to it.
+
 ## Co-op and versus
 
 Play any stage (normal or endless) with other people, on rooms our server hosts. The **Multiplayer** card on the
@@ -642,10 +676,12 @@ web/src/
   app/               state, settings (sanitised, CS2 cvars), session (one attempt), loop (frames + 64-tick step),
                      input (keys, raw mouse, touch, fullscreen, keyboard lock), camera (first / third person),
                      bosses (squad fire, shots, BossHUD numbers), endless, records, account (Steam sign-in state),
-                     activity (your runs to the server), replay-record / replay-play / replay-view / replay (replays)
+                     activity (your runs to the server), replay-record / replay-play / replay-view / replay (replays),
+                     dodges (the end-of-run report's dodge count), console/ (registry: convars + commands; exec:
+                     parse, run, complete; builtins, game, feeds, run-report, output; index: the ` key)
   ui/                maps (the map picker), menu (tabs: Play / Settings), hud (CS2 Panorama HUD + BossHUD panel), overlay (end cards),
                      home / home-feed / home-history (the home page, live feed, Your runs), replay-bar, steam-button,
-                     touch (joystick, look, jump / crouch / fire buttons) + their css
+                     touch (joystick, look, jump / crouch / fire buttons), console (the console window) + their css
   world/             collision (box traces, BVH, ray-vs-hull), movement (CS2), render (three.js, ping history),
                      assets, body (third-person CT), entities/ (engine, entity, keyvalues, math, registry,
                      classes/{logic,spawners,movers,trains,paths,brushes,triggers,fx})

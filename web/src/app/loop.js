@@ -248,7 +248,9 @@ export function step() {
     footsteps(inp, before);
   }
 
-  for (const ev of engine.updateTriggers(player)) {
+  const touched = engine.updateTriggers(player);
+  run.dodges?.observe(engine, player, touched, run.started && !run.done); // the end-of-run report's dodges (app/dodges.js)
+  for (const ev of touched) {
     if (ev.type === 'hurt' && run.started && !run.done) {
       if (ev.first) { run.hits++; G.flash(); G.audio.play('hurt', { pos: player.origin }); }
       hurtPlayer(ev.damage, ev.ent);

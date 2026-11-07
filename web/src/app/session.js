@@ -23,6 +23,9 @@ import { consoleSay } from './chat.js';
 import { simulatedPing } from './coop-load.js';
 import { waterQuery } from '../world/water-volumes.js';
 import { waterSound } from './water-sounds.js';
+import { DodgeTracker } from './dodges.js';
+import { reportRun } from './console/run-report.js';
+import { con } from './console/output.js';
 
 export function endRun() {
   G.audio.stopAll();
@@ -66,6 +69,8 @@ export function startScenario(i, mode = 'normal') {
     seed: S.replay ? S.replay.meta.seed : (S.mp?.rules.seed || settings.seed || (Date.now() & 0xffff)),
     // ready: the stage is loaded and drawn (app/readiness.js); go: a round's server started everyone's clock
     ready: false, go: !S.mp, loading: 'loading',
+    // the end-of-run report (app/console/run-report.js): what came at you and what you got past, your shots and jumps
+    dodges: new DodgeTracker(hazardName), shots: 0, jumps: 0,
   };
 
   player.gravityScale = scenario?.player?.gravity ?? 1;
@@ -81,9 +86,10 @@ export function startScenario(i, mode = 'normal') {
     if (!run.started || run.done || run.noFall || !scale || v <= 580) return;
     const dmg = (v - 580) * (100 / (1024 - 580)) * scale;
     run.rec?.event(run.ticks, 'fall', { damage: Math.round(dmg * 10) });
+    run.dodges.damage('fall', dmg);
     hurtPlayer(dmg, 'fall');
   };
-  player.onJump = () => G.audio.play('jump', { pos: player.origin });
+  player.onJump = () => { G.audio.play('jump', { pos: player.origin }); if (run.started && !run.done) run.jumps++; };
 
   // map sounds arrive with the entities they belong to: as late as the simulated ping draws them
   // During a silent fast-forward, remember what is still sounding, so it can join at the right point after.
@@ -184,6 +190,7 @@ export function startScenario(i, mode = 'normal') {
     if (S.run !== run) return;
     run.ready = true;
     run.loading = '';
+    if (!S.replay) con.game(`${scenario ? scenario.name : 'Free roam'} on ${map.name}: ready in ${Math.round(performance.now() - run.wall0)} ms (seed ${run.seed})`);
     if (S.mp) S.mp.sendReady();
     // what the map spawns mid-stage, made ready in idle time so its first spawn doesn't stall a frame (world/warm.js)
     if (!S.replay?.fast) warmTemplates({ renderer: G.renderer, map, engine: S.engine, scenario, view, origin: [...player.origin], isCurrent: () => S.run === run && !run.done }).catch((e) => console.warn('warm-up:', e));
@@ -254,6 +261,7 @@ export function finish(result) {
     if (run.spectating) return;
     run.spectating = true;
     run.deadAt = stageTime();
+    reportRun(run, { result: 'dead', scenario: S.scenario, map: S.map.name, time: run.deadAt, cause: hazardName(run.killedBy) });
     // CS2's death-cam mix (DeathFadeLayer to 0.15 over 2 s, audio/layers.js) only with nobody left to watch: with a
     // teammate alive you are in their eyes at once (app/coop.js spectateView), hearing what they hear
     if (!S.mp.watchable) G.audio.deathFade?.('death');
@@ -268,6 +276,7 @@ export function finish(result) {
   const scenario = S.scenario;
   const map = S.map.name;
   const stage = scenario?.id || 'free';
+  reportRun(run, { result, scenario, map, time: t, cause: result === 'dead' ? hazardName(run.killedBy) : '' });
   G.pause();
   document.exitPointerLock?.();
 

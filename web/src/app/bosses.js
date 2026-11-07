@@ -144,6 +144,7 @@ export function onShot(shot) {
   // CS2 doesn't clamp eye + punch: past straight up the shot goes on over the top, kept as a pitch inside +-90
   const [pitch, yaw] = foldPitch(player.pitch + p[0], player.yaw + p[1]);
   run.rec?.shot(run.ticks, shot, yaw, pitch); // its replay redoes it on the same tick (app/replay-play.js)
+  if (shot.kind === 'bullet' && run.started) run.shots++; // the end-of-run report's accuracy (app/console/run-report.js)
   shootAs(shot, yaw, pitch);
 }
 

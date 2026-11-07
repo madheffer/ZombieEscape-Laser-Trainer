@@ -50,7 +50,7 @@ export const DEFAULTS = {
 };
 
 // Allowed range per numeric setting; a saved value outside it is clamped (the menu can't produce one).
-const RANGES = {
+export const RANGES = {
   sens: [0.001, 100], timescale: [0.01, 4], humans: [1, 64], bossHp: [1, 100], ping: [0, 500],
   sfx: [0, 1], music: [0, 1], voice: [0, 1], tpDist: [15, 150], gamma: [1, 2.5], renderScale: [0.25, 1], pixelCap: [0.5, 3], quality: [0, 3], streamDistance: [0, 2], touchSens: [0.2, 3], ultimaAt: [0, 300],
 };
@@ -113,6 +113,10 @@ export function saveSettings() { saveJson(KEY, settings); }
 
 const PERCENT = new Set(['sfx', 'music', 'voice']);
 
+// each bound control's redraw from `settings`: syncControls() after something else (the console) changed a setting
+const redraws = [];
+export function syncControls() { for (const fn of redraws) fn(); }
+
 // Wire every settings control in the menu to `settings`; onChange runs after each edit.
 export function bindSettings(onChange) {
   const bind = (id, key, label) => {
@@ -125,6 +129,7 @@ export function bindSettings(onChange) {
       out.textContent = label ? label(settings[key]) : PERCENT.has(key) ? `${Math.round(settings[key] * 100)}%` : settings[key];
     };
     show();
+    redraws.push(() => { if (el.type === 'checkbox') el.checked = !!settings[key]; else el.value = settings[key]; show(); });
     el.addEventListener('input', () => {
       if (el.type === 'checkbox') settings[key] = el.checked;
       else { const v = Number(el.value); if (Number.isFinite(v)) settings[key] = RANGES[key] ? clamp(v, ...RANGES[key]) : v; }
@@ -162,6 +167,7 @@ function bindPair(rangeId, numId, key, min, max, onChange, step = 1) {
   const dp = step < 1 ? String(step).split('.')[1].length : 0;
   const show = () => { range.value = settings[key]; num.value = Number(settings[key]).toFixed(dp); };
   show();
+  redraws.push(show);
   const commit = (v) => { settings[key] = snap(v); show(); saveSettings(); onChange(); };
   range.addEventListener('input', () => commit(Number(range.value)));
   num.addEventListener('change', () => { const v = Number(num.value); commit(Number.isFinite(v) ? v : settings[key]); });
