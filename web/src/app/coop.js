@@ -17,6 +17,9 @@ import { startScenario, stageTime, finish } from './session.js';
 import { bossTargets, applyBossDamage } from './bosses.js';
 import { showRoundEnd } from './coop-end.js';
 import { isMapName } from '../lib/paths.js';
+import { heldWeapon, isWeaponName } from '../lib/weapons.js';
+import { moveKeys } from '../lib/move-keys.js';
+import { weaponAction, cleanWeaponAction } from '../lib/weapon-action.js';
 import { TICK, queueMateUse } from '../world/run-engine.js';
 import { lastFrameAt } from './loop.js';
 import { systemLine } from './chat.js';
@@ -122,8 +125,10 @@ class Round {
   // the stage's clear / fail: the server's own copy of the run decides it, so nothing is sent
   outcome() {}
 
-  // every tick: where you stood (what your map's triggers saw), for the server's copy of your run
-  record(k, player) {
+  // every tick: where you stood (what your map's triggers saw), for the server's copy of your run; keys: your move
+  // keys [forward, side] (sent with the batch for your body's plant and turn on their screens)
+  record(k, player, keys) {
+    this.keys = keys;
     if (this.ended || S.run?.spectating) return;
     if (!this.ticks.length) this.tick0 = k;
     const o = player.origin; // to 1/1000 u: small frames, and far finer than any trigger edge
@@ -146,7 +151,7 @@ class Round {
     const p = S.player;
     while (this.ticks.length) {
       const part = this.ticks.splice(0, MAX_SAMPLES);
-      net.game({ t: 's', r: this.r, k: this.tick0, p: part, yaw: r1(p.yaw), pitch: r1(p.pitch) });
+      net.game({ t: 's', r: this.r, k: this.tick0, p: part, yaw: r1(p.yaw), pitch: r1(p.pitch), w: heldWeapon(G.vm), mv: this.keys || [0, 0], ...weaponAction(G.vm) });
       this.tick0 += part.length;
     }
   }
@@ -319,7 +324,8 @@ function onGame(d, at = performance.now()) {
         const positions = tr.length ? tr : [[...d.o, d.duck]];
         // when it arrived on the round clock, to the millisecond (run.t moves a tick at a time): how late it is
         const arrived = run.go ? Math.max(run.t, (at - run.wall0) / 1000) : run.t;
-        G.peers.pushBatch(d.from, { at: d.at, positions, yaw: d.yaw, pitch: d.pitch, hp: num(d.hp, 0, 1e6) ? d.hp : 0, tick: TICK }, arrived);
+        G.peers.pushBatch(d.from, { at: d.at, positions, yaw: d.yaw, pitch: d.pitch, hp: num(d.hp, 0, 1e6) ? d.hp : 0, tick: TICK,
+          weapon: isWeaponName(d.w) ? d.w : null, keys: moveKeys(d.mv), action: cleanWeaponAction(d) }, arrived);
       }
       break;
     case 'clock':

@@ -4,6 +4,7 @@ import { S, G } from './state.js';
 import { settings } from './settings.js';
 import { rule, timescale, godMode, moveSettings } from './rules.js';
 import { clamp } from '../lib/math.js';
+import { heldWeapon } from '../lib/weapons.js';
 import { readInput, takeLookDelta, takeTickLook, syncLeaveGuard } from './input.js';
 import { bossFire, bossStatus, bossShown, trackSegments, shootAs } from './bosses.js';
 import { applyPose, eventsAfter, eventsDuring } from './replay-play.js';
@@ -155,7 +156,14 @@ export function frame(now) {
   const rv = S.replay && S.run ? replayView(eye, a, realDt) : null;
   if (rv) { G.renderer.setView(rv.pos, rv.yaw, rv.pitch); tp = rv.body; }
   else G.renderer.setView(cameraPosition(S.world, eye, view.yaw, view.pitch, tp, settings.tpDist), view.yaw, view.pitch);
-  G.body?.update({ visible: tp, origin: o, yaw: player.yaw, ducked: player.ducked, duckAmount: player.duckAmount, onGround: player.onGround });
+  // your body: third person, or your legs under you in first person (CS2 draws them; Settings can hide them)
+  const legs = !tp && settings.showLegs && !!S.run && !S.run.spectating && (!rv || S.replay.cam === 'first');
+  // a replay moves you by origin alone: its velocity is the tick's step
+  const vel = S.replay && prevOrigin ? [0, 1, 2].map((i) => (player.origin[i] - prevOrigin[i]) / CS.tick) : player.velocity;
+  G.body?.update({ visible: tp || legs, firstPerson: legs, origin: o, yaw: player.yaw, ducked: player.ducked, duckAmount: player.duckAmount,
+    onGround: player.onGround, velocity: vel, walking: lastWalk, wish: S.replay ? null : lastWish, maxSpeed: player.maxSpeed, weapon: heldWeapon(G.vm),
+    shots: G.vm?.shots, attack: G.vm?.lastAttack, reloading: !!(G.vm?.held && G.vm.reloading), clip: G.vm?.held ? G.vm.clip : undefined,
+    pitch: rv ? rv.pitch : view.pitch, dt: live ? realDt * timescale() : 0 });
   G.peers?.update(G.renderer.camera, spec?.id);
   G.renderer.showHitboxes = rule('hitboxes'); // a round's are the room's
   G.stream?.update(G.renderer.camera.position.toArray(camPos), G.renderer.lighting?.viewDistance ?? Infinity); // the world's chunks around the camera (Source units)
@@ -194,6 +202,8 @@ export function frame(now) {
   if (S.run && hudClock >= 0.05) { hudClock = 0; updateHud(); }
 }
 let hudClock = 0;
+let lastWalk = false; // the walk key on the last tick (the body's move_is_walking)
+let lastWish = [0, 0]; // the move keys on the last tick [forward, side] (the body's plant and turn)
 
 export function step() {
   const { engine, player, world } = S;
@@ -228,6 +238,8 @@ export function step() {
   if (!S.replay) {
     // window.__lasersInput drives the player in tests: solo only (no bots in a round)
     inp = (!S.mp && window.__lasersInput?.(run.t)) || (S.locked ? readInput() : IDLE);
+    lastWalk = !!inp.walk;
+    lastWish = [inp.forward || 0, inp.side || 0];
     player.maxSpeed = G.vm.held ? G.vm.held.maxSpeed : 250; // CS2's m_flMaxSpeed: knife 250, PP-Bizon / USP-S 240, AK-47 215
     player.tick(inp, moveSettings());
   }
@@ -246,7 +258,7 @@ export function step() {
     footsteps(IDLE, before);
   } else {
     // the tick's final pose (moved, then carried): what the round's server checks against this tick's solids
-    S.mp?.record(run.ticks, player); // a round's server replays your run from these (the anti-cheat)
+    S.mp?.record(run.ticks, player, lastWish); // a round's server replays your run from these (the anti-cheat)
     run.rec?.pose(run.ticks, player, G.vm.weapon); // your solo run's replay (app/replay-record.js)
     footsteps(inp, before);
   }

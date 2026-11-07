@@ -1,5 +1,5 @@
 // The other players in a co-op / versus round: a CT body each where they stand (world/body.js, the same agent
-// as your own third person; a plain capsule until it has loaded, or if it can't) and a name tag above them.
+// as your own third person, animated by CS2's player anim graph from how they move; a plain capsule until it has loaded, or if it can't) and a name tag above them.
 //
 // Where each is drawn, and when, is world/peer-track.js: CS2's interpolation (a little in the past, between their
 // tick samples) on a clock that eases instead of jumping. The spectator camera and the radar read the same tracks.
@@ -7,6 +7,8 @@ import * as THREE from 'three';
 import { PlayerBody } from './body.js';
 import { PeerTrack } from './peer-track.js';
 import { CS } from './movement.js';
+import { unwrapCount, stabOrSwing } from '../lib/weapon-action.js';
+import { GUN_ATTACK } from './body-actions.js';
 
 const TAG_HEIGHT = 84; // name tag this far above the feet
 
@@ -67,7 +69,16 @@ export class Peers {
   }
 
   // a batch from the network (validated by app/coop.js): world/peer-track.js push; now = your run time as it arrived
-  pushBatch(id, batch, now) { this.list.get(id)?.track.push(batch, now); }
+  pushBatch(id, batch, now) {
+    const p = this.list.get(id);
+    if (!p) return;
+    p.track.push(batch, now);
+    if (batch.weapon) p.weapon = batch.weapon; // the newest: a swap shows as soon as it arrives
+    p.keys = batch.keys || null; // their move keys (their body's plant and turn; null from an older client)
+    // their shots / swings / reload (lib/weapon-action.js), played by their body as the batch arrives
+    const a = batch.action;
+    if (a) { p.shots = unwrapCount(p.shots, a.f); p.reloading = !!a.rl; p.attack = /knife|bayonet/.test(p.weapon || '') ? stabOrSwing(a.fs) : GUN_ATTACK; }
+  }
 
   // every frame, first: your run time this frame, between ticks (null = not in a round). Everything drawn this
   // frame (bodies, the spectator camera, the radar) reads the players at the same moment
@@ -94,7 +105,17 @@ export class Peers {
       const show = !!s && id !== hide;
       if (p.body) {
         p.capsule.visible = false;
-        p.body.update(show ? { visible: true, origin: s.o, yaw: s.yaw, duckAmount: s.duck } : { visible: false });
+        if (show) {
+          // their velocity from where they're drawn frame to frame (the track carries positions, not velocities)
+          const dt = p.lastWall ? (this.wall - p.lastWall) / 1000 : 0;
+          const vel = p.lastO && dt > 0 ? [0, 1, 2].map((i) => (s.o[i] - p.lastO[i]) / dt) : [0, 0, 0];
+          const k = p.vel ? Math.min(1, dt / 0.1) : 1; // smoothed over ~0.1 s (their samples come in steps)
+          p.vel = p.vel ? p.vel.map((v, i) => v + (vel[i] - v) * k) : vel;
+          p.lastO = [...s.o];
+          p.lastWall = this.wall;
+          p.body.update({ visible: true, origin: s.o, yaw: s.yaw, pitch: s.pitch, duckAmount: s.duck, velocity: p.vel,
+            onGround: Math.abs(p.vel[2]) < 40, wish: p.keys, weapon: p.weapon, shots: p.shots, attack: p.attack, reloading: p.reloading, dt: Math.min(0.1, dt) });
+        } else { p.lastO = null; p.body.update({ visible: false }); }
       } else {
         p.capsule.visible = show;
         if (show) p.capsule.position.set(s.o[0], s.o[1], s.o[2] + 36 - 9 * s.duck);

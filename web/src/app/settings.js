@@ -31,6 +31,7 @@ export const DEFAULTS = {
   perfectTeam: false, // true = the other humans never stop shooting (the old fast kill)
   ping: 0, // simulated round trip in ms (0-500): the map's entities are drawn this late (see render.js record())
   thirdPerson: false, tpDist: 65,
+  showLegs: true, // your body under you in first person, as CS2 draws it (world/body.js); off = no legs at all
   perfMeter: true, // the FPS (and in a room, ping) readout top right (ui/perf-meter.js)
   fpsUncapped: false, // frames while playing aren't held to the monitor's refresh (app/loop.js scheduleFrame)
   minimap: true, // CS2's radar top left (ui/radar.js), on maps that ship an overview
@@ -150,7 +151,7 @@ export function bindSettings(onChange) {
   syncHumans(); $('#fixedhumans')?.addEventListener('input', syncHumans);
   bind('#autofire', 'autoFire'); bind('#falldmg', 'fallDamage');
   bind('#fullscreen', 'fullscreen'); bind('#perfectteam', 'perfectTeam');
-  bind('#thirdperson', 'thirdPerson'); bind('#touchcrouch', 'touchCrouch'); bind('#minimap', 'minimap'); bind('#perfmeter', 'perfMeter'); bind('#fpsuncapped', 'fpsUncapped');
+  bind('#thirdperson', 'thirdPerson'); bind('#showlegs', 'showLegs'); bind('#touchcrouch', 'touchCrouch'); bind('#minimap', 'minimap'); bind('#perfmeter', 'perfMeter'); bind('#fpsuncapped', 'fpsUncapped');
   bind('#touchsens', 'touchSens', (v) => `${v.toFixed(1)}×`);
   bindPair('#ping', '#ping-num', 'ping', 0, 500, onChange);
   bindPair('#tpdist', '#tpdist-num', 'tpDist', 15, 150, onChange);

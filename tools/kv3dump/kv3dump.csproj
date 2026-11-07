@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Dumps compiled CS2 resources (anim graphs, clips, skeletons) to KV3 text for tools/tp-graph.mjs.
+       Needs a ValveResourceFormat newer than the bake's NuGet 20.1 (CS2's .vnmgraph_c uses KV3 type 26, which 20.1
+       can't read): point LASERS_VRF_DIR at a folder holding a recent ValveResourceFormat.dll + ValvePak.dll +
+       ValveKeyValue.dll (default: vpkstuff's vendored build). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <VrfDir Condition="'$(LASERS_VRF_DIR)' != ''">$(LASERS_VRF_DIR)</VrfDir>
+    <VrfDir Condition="'$(VrfDir)' == ''">$(MSBuildThisFileDirectory)..\..\..\vpkstuff\dotnet\VpkStuff.Backend\bin\Release\net10.0</VrfDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="$(VrfDir)\ValveResourceFormat.dll" />
+    <Reference Include="$(VrfDir)\ValveKeyValue.dll" />
+    <None Include="$(VrfDir)\K4os.Compression.LZ4.dll;$(VrfDir)\ZstdSharp.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('$(VrfDir)\ZstdSharp.dll')" />
+  </ItemGroup>
+</Project>

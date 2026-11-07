@@ -1,37 +1,45 @@
-// Your own body in third person (CS2Fixes !tp): the stock CT agent, standing where you are, facing your yaw,
-// holding the default CT knife, crouching as you duck.
+// A player's body (your own third person, your first-person legs, teammates): the stock CT agent where they stand,
+// facing their body yaw (which trails the view: anim-graph/anim-state.js), every bone driven by CS2's own player anim graph (world/anim-graph/: the compiled
+// worldmodel.vnmgraph and the graphs it references, run by a port of the runtime they come from) from the player's
+// movement (anim-graph/params.js).
 //
-// How it is posed is vpkstuff's previewer (frontend/previewer/tp.js), cut down to what a STOCK agent needs:
-//   - CS2 applies a clip's translation channel on every bone, so the pose is rebuilt on the clip's own STOCK
-//     skeleton (pose JSON: `skeleton` + per-bone tracks) and copied onto the model in world space. The model's bind
-//     translations never drive anything (they only feed the inverse bind), exactly as in game.
-//   - The stance is CS2's knife-class aim pose, `idle_knife` (ABSOLUTE on every bone: sampled at t=0 it IS the
-//     stance). Ducking blends to the same class's `idle_crouch_knife`, also absolute, by the duck amount, the way the
-//     anim graph's stand/crouch blend reads m_flDuckAmount. No locomotion: you slide in the stance.
+// How the pose reaches the model is vpkstuff's previewer (frontend/previewer/tp.js):
+//   - CS2 applies a clip's translation channel on every bone, so the pose is built on the clip's own STOCK skeleton
+//     (anim/skeleton.json) and copied onto the model in world space. The model's bind translations never drive
+//     anything (they only feed the inverse bind), exactly as in game.
 //   - The agent's _TWIST bones take a share of their target's roll (its CTiltTwistConstraints, tp.js's solve).
-//   - The knife rides the stock skeleton's `wpn` bone through its own `weapon` root bone (the authored mount).
-// A stock agent has no proportion (twin) rig, so tp.js's twin/partner/IK paths are not needed here.
+//   - The held weapon rides the stock skeleton's `wpn` bone through its own `weapon` root bone (body-weapon.js).
+//   - First person (CS2's legs when you look down): this whole body where you stand, its upper half thrown off the
+//     bottom of the screen by CS2's own vertex warp, drawn only when you look down past 50 deg (world/body-legs.js,
+//     read from client.dll + the csgo_character shader). No knife (the viewmodel holds it).
 //
-// Assets (public/player/, gitignored, Valve content): `lasers-bake --player` writes the two glbs; the stance files
-// come from vpkstuff's clip decode + tools/tp-pose.mjs (README "Third person").
+// Assets (public/player/, gitignored, Valve content): `lasers-bake --player` writes the two glbs;
+// `node tools/tp-graph.mjs` the anim graphs (README "The player's body").
 import * as THREE from 'three';
-import { loadGltf, unwrapToSourceSpace, sampleVec, sampleQuat } from '../weapons/fp/util.js';
+import { loadGltf, unwrapToSourceSpace } from '../weapons/fp/util.js';
 import { fetchJson } from '../lib/fetch.js';
 import { clamp01 } from '../lib/math.js';
 import { DEG } from './entities/math.js';
+import { GraphInstance, Context } from './anim-graph/graph.js';
+import { PawnParams } from './anim-graph/params.js';
+import { AnimLibrary } from './anim-graph/library.js';
+import { legsVisible, legsUniforms, patchLegs } from './body-legs.js';
+import { BodyWeapon } from './body-weapon.js';
+import { BodyActions } from './body-actions.js';
 
 const BASE = `${import.meta.env?.BASE_URL ?? '/'}player/`;
 const FILES = {
   body: 'ctm_sas/ctm_sas.glb',
   constraints: 'ctm_sas/ctm_sas.constraints.json',
-  knife: 'knife_default_ct/weapon_knife_default_ct.glb',
-  stand: 'clips/pose_idle_knife.json',
-  crouch: 'clips/pose_idle_crouch_knife.json',
 };
 // The agent glb carries every mesh group: only the third-person body + gloves are drawn (first-person arms and
 // sleeves, the defuse kit a ZE human never carries, and VRF's empty skeleton reference mesh stay hidden).
 const DRAWN = /thirdperson/i;
-const MOUNT_BONES = ['weapon', 'weapon_offset'];
+// one anim library for every body on the page (your own, teammates): the graphs and clips are shared, read-only
+let library = null;
+function animLibrary(log) {
+  return (library ||= new AnimLibrary(log).load(['worldmodel_locomotion+knife', 'worldmodel_knife+default_ct']));
+}
 const AXES = [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)];
 const ONE = new THREE.Vector3(1, 1, 1);
 
@@ -55,7 +63,7 @@ export class PlayerBody {
     this.place.name = 'player-body';
     scene.add(this.place);
     this.ready = false;
-    this.posedAt = NaN;
+    this.legs = legsUniforms(); // first person's warp (world/body-legs.js), off for third person and teammates
     this._m = new THREE.Matrix4(); this._w = new THREE.Matrix4(); this._inv = new THREE.Matrix4();
     this._p = new THREE.Vector3(); this._p2 = new THREE.Vector3(); this._s = new THREE.Vector3();
     this._q = new THREE.Quaternion(); this._q2 = new THREE.Quaternion();
@@ -67,12 +75,14 @@ export class PlayerBody {
   load() { return (this.loading ||= this._load()); }
 
   async _load() {
-    const [gltf, stand] = await Promise.all([loadGltf(BASE + FILES.body), fetchJson(BASE + FILES.stand)]);
-    const crouch = await fetchJson(BASE + FILES.crouch).catch((e) => { this.log(`body: no crouch stance (${e.message}), standing only`); return null; });
-    this.stand = stand.clips[0];
-    this.crouch = crouch?.clips?.[0] ?? null;
-    this.skeleton = stand.skeleton;
-    this.order = this._parentFirst(stand.skeleton);
+    const [gltf, lib] = await Promise.all([loadGltf(BASE + FILES.body), animLibrary(this.log)]);
+    // CS2's player anim graph drives every bone (world/anim-graph/): one instance per body
+    const sk = lib.skel;
+    this.skeleton = Object.fromEntries(sk.bones.map((b, i) => [b, { index: i, parent: sk.parents[i] >= 0 ? sk.bones[sk.parents[i]] : null }]));
+    this.graph = new GraphInstance(lib.root, lib);
+    this.ctx = new Context(sk);
+    this.params = new PawnParams();
+    this.order = this._parentFirst(this.skeleton);
     this.stockWorld = new Map(this.order.map((n) => [n, new THREE.Matrix4()]));
 
     this.root = gltf.scene;
@@ -99,25 +109,43 @@ export class PlayerBody {
       }
     } catch (e) { this.log(`body: no twist constraints (${e.message})`); }
 
-    try { this.knife = await this._loadKnife(); } catch (e) { this.log(`body: no knife (${e.message}), the body alone`); }
+    this.weapon = new BodyWeapon(this.place, this.log); // the held weapon's world model (body-weapon.js)
+    this.actions = new BodyActions(); // shots and reloads (body-actions.js)
+    patchLegs(this.root, this.legs);
     this.onModel?.(this.place);
     this.ready = true;
-    this.log(`body: ctm_sas, ${this.joints.size} bones, ${this.twists.length} twist constraints${this.crouch ? ', crouch stance' : ''}`);
+    this.log(`body: ctm_sas, ${this.joints.size} bones, ${this.twists.length} twist constraints, CS2's player anim graph`);
   }
 
-  // state: { visible, origin (feet, Source units), yaw (deg), ducked, duckAmount (0..1), onGround }
+  // state: { visible, origin (feet, Source units), yaw (deg, the view's), ducked, duckAmount (0..1), onGround, ladder,
+  //   velocity [x, y, z], walking, wish [forward, side] (the keys, side + = right; null = unknown), maxSpeed, weapon (vdata name), action, shots / attack / reloading / clip (body-actions.js), firstPerson, pitch (deg, the view's: first person draws only looking down),
+  //   dt (s since the last frame) }
   update(state) {
     // your own body loads the first time it is shown (third person, a replay's camera): ~15 MB of model and
     // textures nobody in first person needs at page start
     if (!this.ready) { if (state.visible && this.lazy) this.load().catch((e) => this.log(`body: ${e.message || e} (third person shows no body)`)); return; }
-    this.place.visible = !!state.visible;
+    const fp = !!state.firstPerson;
+    const pitch = state.pitch || 0;
+    // the pose (and the locomotion clock) keeps running while the legs are out of view
+    this.place.visible = !!state.visible && (!fp || legsVisible(pitch));
     if (!state.visible) return;
     const o = state.origin;
     this.place.position.set(o[0], o[1], o[2]);
-    this.place.rotation.set(0, 0, (state.yaw || 0) * DEG);
-    const w = this.crouch ? clamp01(state.duckAmount ?? (state.ducked ? 1 : 0)) : 0;
-    // the pose depends only on the duck blend (bone locals do not change with where you stand): re-pose on change
-    if (!(Math.abs(w - this.posedAt) < 1e-3)) { this._pose(w); this.posedAt = w; }
+    this.fp = fp;
+    this.weapon.set(state.weapon || 'weapon_knife', !fp); // first person: the viewmodel holds it
+    this.legs.cs2LegsFade.value = fp ? 1 : 0;
+    this.legs.cs2ViewFwdZ.value = -Math.sin(pitch * DEG); // the view's forward z (Source: pitch down is positive)
+    const duck = clamp01(state.duckAmount ?? (state.ducked ? 1 : 0));
+    const dt = Math.min(0.1, Math.max(0, state.dt ?? 1 / 60));
+    const p = this.params.update({ velocity: state.velocity, yaw: state.yaw, pitch, duck, onGround: state.onGround !== false,
+      ladder: state.ladder, walking: state.walking, wish: state.wish, maxSpeed: state.maxSpeed, weapon: state.weapon, action: state.action, dt });
+    // the body faces its own yaw, which trails the view (CS2's CCSPlayerAnimationState; Aim IK turns the spine the rest)
+    this.place.rotation.set(0, 0, this.params.bodyYaw * DEG);
+    const a = this.actions.update({ shots: state.shots, attack: state.attack, reloading: state.reloading, clip: state.clip, dt });
+    for (const k in p) this.graph.set(k, p[k]);
+    for (const k in a) this.graph.set(k, a[k]); // a shot / reload wins over the deploy and idle
+    this.pose = this.graph.update(this.ctx, dt);
+    this._pose();
   }
 
   // parent-first order of the stock skeleton, so world matrices accumulate in one pass
@@ -132,24 +160,19 @@ export class PlayerBody {
     return order;
   }
 
-  // one bone's local transform at t=0 of a clip (tracks missing -> the stock rest offset)
-  _local(clip, name, q, p) {
-    const tr = clip?.bones[name], st = this.skeleton[name];
-    if (!sampleQuat(tr?.rot, 0, q)) q.set(st.rot[0], st.rot[1], st.rot[2], st.rot[3]);
-    if (!sampleVec(tr?.pos, 0, p)) p.set(st.pos[0], st.pos[1], st.pos[2]);
+  // one bone's parent-space transform from this frame's graph pose
+  _local(name, q, p) {
+    const k = this.skeleton[name].index * 8, t = this.pose.t;
+    p.set(t[k], t[k + 1], t[k + 2]);
+    q.set(t[k + 4], t[k + 5], t[k + 6], t[k + 7]);
   }
 
-  _pose(w) {
+  _pose() {
     this.place.updateMatrixWorld(true);
     const align = this.place.matrixWorld;
-    // 1. CS2's skeleton for this blend, in the body's own space
+    // 1. CS2's skeleton for this frame's pose, in the body's own space
     for (const n of this.order) {
-      this._local(this.stand, n, this._q, this._p);
-      if (w > 0) {
-        this._local(this.crouch, n, this._q2, this._p2);
-        this._q.slerp(this._q2, w);
-        this._p.lerp(this._p2, w);
-      }
+      this._local(n, this._q, this._p);
       const local = this._m.compose(this._p, this._q, ONE);
       const par = this.skeleton[n].parent && this.stockWorld.get(this.skeleton[n].parent);
       const out = this.stockWorld.get(n);
@@ -180,25 +203,7 @@ export class PlayerBody {
       c.slave.updateMatrix();
       c.slave.updateMatrixWorld(true);
     }
-    // 4. the knife on the stock `wpn` (holder is a child of `place`, so the body-space matrix is its local one)
-    const wpn = this.stockWorld.get('wpn');
-    if (this.knife && wpn) this.knife.holder.matrix.multiplyMatrices(wpn, this.knife.mountInv);
-  }
-
-  async _loadKnife() {
-    const g = await loadGltf(BASE + FILES.knife);
-    const holder = new THREE.Group();
-    holder.matrixAutoUpdate = false;
-    holder.add(unwrapToSourceSpace(g.scene));
-    holder.updateMatrixWorld(true);
-    let mount = null;
-    for (const n of MOUNT_BONES) if (!mount) g.scene.traverse((o) => { if (!mount && o.name === n) mount = o; });
-    if (!mount) throw new Error('no weapon mount bone');
-    g.scene.traverse((o) => { if (o.isMesh) o.frustumCulled = false; });
-    // where the mount bone sits in the holder, position + rotation only (the glb's own scale is the item's size)
-    mount.matrixWorld.decompose(this._p, this._q, this._s);
-    const mountInv = new THREE.Matrix4().compose(this._p, this._q, ONE).invert();
-    this.place.add(holder);
-    return { holder, mountInv };
+    // 4. the held weapon on the stock `wpn`
+    this.weapon.pose(this.stockWorld.get('wpn'));
   }
 }

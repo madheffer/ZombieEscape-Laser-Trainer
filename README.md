@@ -375,15 +375,60 @@ train move / ping / start / stop, door and movelinear sounds, from server.dll / 
 `audio/audio.js` plays them (CS2 distance curves, csgo_mega voice limits in `audio/limits.js`, every voice x its mix group's Default_Mix level as CS2's soundmixers.txt sets it (World 0.4, Weapons 0.6, BulletImpacts 0.3 ...; `audio/mix.js`, table `lib/sound-mix-cs2.js` from `lasers-bake --mixers`), the event's distance_multiplier and volume randomness, music through the music volume, then CS2's final-mix compressor `FinalMixGlue` from `sounds/graphs/__main__.vmix`: `audio/mixglue.js`). Test pages:
 `audio-test.html`, `vm-test.html`.
 
-Third person (CS2Fixes `!tp`, menu "Video & camera"): `world/body.js` draws your CT, the stock
-`agents/models/ctm_sas/ctm_sas.vmdl` (a ZR human class in CS2Fixes' playerclass example) holding the default CT knife.
-It is posed the way vpkstuff's previewer (`frontend/previewer/tp.js`) does it: CS2's knife-class aim pose `idle_knife`
-rebuilt on the clip's own stock skeleton and copied onto the model, the agent's twist constraints, the knife on the
-stock `wpn` bone; ducking blends to `idle_crouch_knife` (also an absolute pose) by the duck amount. No locomotion.
-Assets in `web/public/player/` (gitignored, ~19 MB): `lasers-bake --player web/public/player` writes the two glbs;
-the stance files are vpkstuff's clip decode (lab `tools/previewer/extract-tp-clips.py`: Source2Viewer-CLI `-d` to DMX,
-`pose_extract.py` to JSON) then `node tools/tp-pose.mjs <decoded.json> web/public/player/clips/pose_<clip>.json`
-(rotates the DMX's Y-up root bones into Z-up; `--check` it against `Z:\weaponviewer\tp\clips\pose_idle_knife.json`);
+### The player's body
+
+`world/body.js` draws a player's CT (your third person (CS2Fixes `!tp`), your first-person legs, teammates): the stock
+`agents/models/ctm_sas/ctm_sas.vmdl` (a ZR human class in CS2Fixes' playerclass example), every bone driven by **CS2's own
+player anim graph**: `animation/graphs/worldmodel/worldmodel.vnmgraph` and the 66 graphs it references (locomotion per
+weapon class, actions per weapon), run by `world/anim-graph/`, a port of the Esoterica runtime CS2's NmGraph comes from
+(state machines + transitions with sync tracks, Blend1D/2D, layers with bone masks (overlay / additive / model space),
+selectors, referenced graphs, event conditions). Clips are CS2's compiled ones, decoded as CS2 samples them
+(`anim-graph/clip.js`: 48-bit quaternions, 16-bit ranged translations).
+- Parameters (`anim-graph/params.js`): what CS2's CCS2PawnGraphController::ReflectPawnState feeds the graph (server.dll
+  2026-11-05 FUN_180ae0aa0), from CCSPlayerAnimationState (`anim-graph/anim-state.js`, the server's Update
+  FUN_180a9d5a0 and its ground-action handlers, ported tick for tick at 64 Hz): a body yaw that trails your view (at
+  most 70 deg; in the air it's your view), start (> 15 u/s from idle, 6 ticks), move, plant and turn (your keys
+  against a velocity along an axis of the body, 12 ticks), turn on the spot (aim 5-30 deg off and still for 95 ticks:
+  eased over 47) and the turn loop (> 30 deg off or a fast turn: 8x the angle left per s), the eased slow-down, and
+  one-tick jump / start fall / land pulses. The model faces the body yaw; Aim IK turns the chest to the view. A
+  weapon swap sets `action_deploy`; co-op batches carry each player's held weapon (`w`) and move keys (`mv`,
+  `lib/move-keys.js`: their plant and turn), their velocity taken from the interpolated track.
+- Aim IK (`anim-graph/aim-cs.js`, CS2's `CNmAimCSNode` / `CNmAimCSTask` in client.dll animtask_aim_cs.cpp): the aim
+  yaw against the body (onto [-55, 65], 0.1 / 0.2 / 0.3 / 0.4 over spine_0..3 about the model's up axis), then the
+  pitch spread over spine_0..3 and neck / head with CS2's per-weapon-class limits and weights. Its per-class weapon /
+  hand solves and two-bone hand IK aren't ported (CS2 turns hand IK off for knives, grenades, the healthshot); the
+  weapon keeps its place in the hand instead, standing in for Snap Weapon.
+- Weapons (`world/body-weapon.js`, `world/body-actions.js`): the held weapon's world model rides the stock `wpn` bone
+  through its own `weapon` mount bone. CS2 uses ONE vmdl for a gun in first and third person, so a gun is the
+  viewmodel's `weapons/fp/classes/<chassis>/weapon_stock.glb` (no extra bake); the knife is the player bake's. Shots
+  set `action_attack` + `attack_type` and pulse `action_reset` per shot (the graph's own `attack_shoot_reset`), a
+  reload sets `action_reload`, `weapon_ammo` is the magazine; `weapon_action_speedscale` must be 1 or the root graph's
+  Weapons/State/Speed Scale freezes every weapon action on frame 0. How long CS2 holds `action_attack` is UNSETTLED.
+  Co-op batches carry `f` (shot count), `fs` (last was a stab), `rl` (reloading): `lib/weapon-action.js`.
+- Foot IK passes through, as it does in CS2 (client_20261015):
+  - ReflectPawnState (`FUN_1808be340`): when `|m_flFootIKOffsetLeft|` or `Right` (CCSPlayerAnimationState +0x38 /
+    +0x3c, client-only) is over 0.1, `ik_left_foot` / `ik_right_foot` become bone targets on `ankle_L` / `ankle_R`
+    offset by (0, 0, offset); otherwise they're unset and the FootIK node leaves the pose alone.
+  - The offsets (`FUN_18088baf0`, called every tick from CCSPlayerAnimationState::Update `FUN_1808a5d70` with
+    on-ground): only on the ground, standing (ground move state idle / turn_on_spot / turn_on_spot_loop), and only
+    when h = movement-services +0x2bc is above 0 (FLT_MAX counts as 0). Each foot traces 24 u down from its ankle's
+    floored x / y at origin z + 1/32 (mask 0x2001, group 11); offset = clamp(hit z - (origin z - h), 0, 10), eased
+    at 200 u/s² rising and 75 falling over the 1/64 s tick. Otherwise it eases back to 0 at 600 u/s².
+  - h is never set: the CCSPlayer_MovementServices constructor (`FUN_1808bce20`) writes FLT_MAX, and nothing else in
+    client.dll stores to that field (every store encoding scanned). server_20261105 has the same update
+    (`FUN_180a7bad0` from `FUN_180a9d5a0`, h at +0x2c4); its only write to that field is the constructor's FLT_MAX
+    (`FUN_180ab4dc0`). So the offsets stay 0 and no targets are ever set. If a CS2 update starts writing h, port the
+    trace above plus CNmFootIKTask's solve.
+- First person (cl_firstperson_legs 1): the same body at your origin, drawn only looking down past 50 deg
+  (r_csgo_gpu_opt_firstpersonlegs_visible_angle 40), its upper half thrown off the screen by the csgo_character
+  vertex shader's legs warp on the POSED vertex heights (`world/body-legs.js`, decompiled from the shader; CS2
+  skins characters before that stage). Your eye height is untouched;
+  Settings > Display "Show your legs" turns it off.
+
+Assets in `web/public/player/` (gitignored, Valve content): `lasers-bake --player web/public/player` writes the two glbs;
+`node tools/tp-graph.mjs` writes `anim/` (skeleton with bone masks, one JSON per graph with its clips, ~25 MB, loaded
+per weapon): it reads pak01 with `tools/vpk.mjs` and dumps the compiled resources with `tools/kv3dump` (needs a
+ValveResourceFormat newer than 20.1: CS2's graphs use KV3 type 26; `LASERS_VRF_DIR`, default vpkstuff's vendored build).
 `ctm_sas/ctm_sas.constraints.json` is copied from `Z:\weaponviewer\fp\agents\`.
 
 ### Sound as CS2 runs it

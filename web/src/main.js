@@ -75,7 +75,7 @@ G.fade = new ScreenFade($('#screenfade')); // env_fade (app/screen-fade.js)
 G.audio = new GameAudio();
 G.vm = new Viewmodel(G.renderer.renderer);
 const litByParticles = (root) => G.renderer.lighting.patchDynamic(root); // the particle lights (world/lighting.js)
-G.body = new PlayerBody(G.renderer.scene, { log, onModel: litByParticles, lazy: true }); // third person (!tp): your own CT
+G.body = new PlayerBody(G.renderer.scene, { log, onModel: litByParticles, lazy: true }); // third person (!tp) / first-person legs: your own CT
 G.hud = new Hud($('#hud'));
 G.radar = new Radar($('#hud')); // the minimap (CS2's own radar) and the EntWatch-style item list under it
 G.itemHud = new ItemHud($('#hud'));

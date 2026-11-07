@@ -8,6 +8,7 @@
 //   vm.pistol                                 // the spawn pistol's (PISTOLS entry, the USP-S); vm.pistolName
 //   vm.held                                   // the held gun's numbers (primary or pistol), null on the knife
 //   vm.clip / vm.reserve / vm.reloading       // the held gun's magazine (the primary's while on the knife)
+//   vm.shots / vm.lastAttack                  // shots + swings played so far, the last one's graph attack_type
 //   vm.update(dt, { speed, onGround, ducked, yawDelta, pitchDelta })   // every frame (sway/bob/landing)
 //   vm.trigger(down)                          // Mouse 1 held/released
 //   vm.trigger2(down)                         // Mouse 2 (knife stab)
@@ -322,6 +323,9 @@ export class Viewmodel {
   // Tell the graph to play the shot. Our gate already decided, so the controller's own refire gate is opened
   // (sinceFire), and the magazine is kept topped up (infinite ammo; an empty mag would play dry fire).
   _play(attackType) {
+    // your third-person body plays it too (world/body-actions.js): a count per shot / swing, and what it was
+    this.shots = (this.shots || 0) + 1;
+    this.lastAttack = attackType || 'attack_gun_primaryfire';
     const s = this.ready ? this._sources[this.weapon] : null;
     if (!s?.graph) return;
     s.wc.sinceFire = 99;

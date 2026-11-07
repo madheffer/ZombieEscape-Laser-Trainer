@@ -85,3 +85,8 @@ export function gunSounds(name) {
   const g = firearm(name);
   return g ? [g.fireSound, ...g.drawSounds.map((s) => s[1]), ...g.reloadSounds.map((s) => s[1])] : [];
 }
+
+// what a viewmodel holds, as CS2's vdata weapon name (the player anim graph picks its weapon graph by it; co-op sends it)
+export const heldWeapon = (vm) => (vm?.weapon === 'gun' ? vm.gunName : vm?.weapon === 'pistol' ? vm.pistolName : 'weapon_knife');
+// a weapon name from the network or a replay: vdata-shaped or nothing
+export const isWeaponName = (w) => typeof w === 'string' && /^weapon_[a-z0-9_]{1,40}$/.test(w);

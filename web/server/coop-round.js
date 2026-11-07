@@ -9,6 +9,9 @@
 //     on alone), fewest hits is the best run; all down, whoever lasted longest.
 // Players only ever talk to the server, so nobody learns anyone else's address.
 import { cleanText, itemHolders, bossHumans } from '../src/lib/room-rules.js';
+import { isWeaponName } from '../src/lib/weapons.js';
+import { moveKeys } from '../src/lib/move-keys.js';
+import { cleanWeaponAction } from '../src/lib/weapon-action.js';
 import { mapLoadout } from '../src/world/items.js';
 import { TICK, COUNTDOWN } from '../src/world/run-engine.js'; // COUNTDOWN: s a round's run waits before the stage starts
 import { PlayerCheck, MAX_PING } from './coop-check.js';
@@ -176,7 +179,7 @@ export class Round {
   ev(event, fields) { this.io.ev?.(event, { room: this.room.code, r: this.r, ...fields }); }
 
   // ---- from players
-  // { k: first tick, p: [[x, y, z, ducked], ...], yaw, pitch }: checked, then the newest relayed to the others
+  // { k: first tick, p: [[x, y, z, ducked], ...], yaw, pitch, w: held weapon, mv: move keys }: checked, then the newest relayed to the others
   onState(c, m) {
     const p = this.players.get(c.id);
     if (!p || !p.alive || this.ended || !this.started || !Number.isInteger(m.k) || m.k < 1 || !Array.isArray(m.p) || !m.p.length || m.p.length > MAX_SAMPLES) return;
@@ -191,6 +194,9 @@ export class Round {
     this.broadcast({
       t: 's', from: c.id, r: this.r, at: p.check.ticks * TICK, o: last, tr,
       yaw: num(m.yaw, -1e4, 1e4) ? m.yaw : 0, pitch: num(m.pitch, -90, 90) ? m.pitch : 0, duck: p.check.ducked ? 1 : 0, hp: Math.max(0, Math.round(p.check.hp)),
+      ...(isWeaponName(m.w) ? { w: m.w } : {}), // what they hold (their body's weapon animations)
+      ...(moveKeys(m.mv) ? { mv: moveKeys(m.mv) } : {}), // their move keys (their body's plant and turn)
+      ...cleanWeaponAction(m), // their shots / swings / reload (lib/weapon-action.js)
     }, c);
   }
 
