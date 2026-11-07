@@ -32,6 +32,7 @@ if (!dir) { console.error('usage: node tools/chunk-world.mjs <web/public/maps/<m
 const mapDir = path.resolve(dir);
 const manifestFile = path.join(mapDir, 'manifest.json');
 const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
+const SOURCE1 = manifest.engine === 'source1'; // splittable(): how a Source 1 world is cut
 const worldRel = String(manifest.world || '');
 if (!/^world\/[\w.-]+\.glb$/.test(worldRel)) { console.error(`manifest.world isn't world/<name>.glb: ${worldRel}`); process.exit(1); }
 const worldDir = path.join(mapDir, 'world');
@@ -83,9 +84,14 @@ nodes0.forEach((n, i) => {
   assign.get(key).add(i);
 });
 
+// A Source 1 map (lasers-bake source1) bakes its whole world into one node: brushes lit from the lightmap atlas
+// (TEXCOORD_1), static props with their light baked per vertex (COLOR_0, extras.lightmap "vertex") and blended faces
+// (water, glass) beside them. None of that light depends on where a piece ends, so every primitive is cut by triangle;
+// blended ones too (three sorts them per piece, Source per face anyway).
 function splittable(node) {
-  return node.getMesh().listPrimitives().every((p) => p.getAttribute('TEXCOORD_1') && p.getIndices() && p.getMode() === 4
-    && p.getMaterial()?.getAlphaMode() !== 'BLEND');
+  return node.getMesh().listPrimitives().every((p) => p.getIndices() && p.getMode() === 4 && (SOURCE1
+    ? p.getAttribute('TEXCOORD_1') || p.getAttribute('COLOR_0')
+    : p.getAttribute('TEXCOORD_1') && p.getMaterial()?.getAlphaMode() !== 'BLEND'));
 }
 
 // column-major 4x4 times a point

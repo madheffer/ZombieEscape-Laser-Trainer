@@ -224,8 +224,13 @@ Files come from the map's pakfile, then CS:GO's `csgo/pak01_dir.vpk`, then `plat
 engine's last search path: `hlmv/gray`). UnlitGeneric faces take no lightmap (white001_nochop lasers in an unlit room).
 
 For a map already baked, redo only those: `lasers-bake <map.bsp> web/public/maps --only sounds,fx,sprites,correction`
-(bumps the manifest version, keeps everything else). Not baked yet: lighting/, tiers, chunks (the whole world glb loads: 27 MB
-for ze_ffvii_malgo_reactor, static props not instanced).
+(bumps the manifest version, keeps everything else). Not baked yet: lighting/, tiers.
+
+World streaming works as for a CS2 map: after every bake (and after cropping) run
+`node tools/chunk-world.mjs web/public/maps/<map>` then `node tools/index-maps.mjs`. The Source 1 world is one node,
+so it is cut by triangle into the cells (brush light comes from the lightmap atlas, prop light is baked per vertex:
+neither depends on where a piece ends; blended faces are cut too). ze_luciddreams_b5: 17.5 MB world glb -> 46 chunks,
+6.6 MB, 13 loaded around the boss corridor. Static props are not instanced (they are baked into the world).
 
 ### Cropping
 
