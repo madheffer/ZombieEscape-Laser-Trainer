@@ -287,7 +287,7 @@ async function loadStage() {
   const progress = (t) => {
     $('#status').textContent = `loading ${name}: ${t}`;
     G.loading.step(stepProgress(t));
-    G.hud.update({ title: `Loading ${name}`, sub: t, hp: 100, armor: 0 });
+    G.hud.update({ run: { map: name, name: 'Loading', sub: t }, hp: 100, armor: 0 });
   };
   if (!G.loading.isOpen) G.loading.begin(name, undefined); // a replay, a test: the screen still covers the load
   const promise = (async () => {

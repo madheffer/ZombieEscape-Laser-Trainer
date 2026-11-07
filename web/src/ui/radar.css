@@ -19,7 +19,7 @@
   position: absolute; left: calc(14 * var(--u)); top: calc(326 * var(--u)); pointer-events: none;
   font: 600 calc(19 * var(--u)) / 1.35 'Stratum2', 'Segoe UI', sans-serif; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
 }
-#hud:not(.has-radar) .hud-items { top: calc(120 * var(--u)); }
+#hud:not(.has-radar) .hud-items { top: calc(170 * var(--u)); } /* under the run panel (ui/hud-run.css) */
 .hud-items[hidden] { display: none; }
 .it-row { display: flex; align-items: baseline; gap: calc(8 * var(--u)); white-space: nowrap; }
 .it-state { min-width: calc(26 * var(--u)); text-align: right; color: #fff; font-variant-numeric: tabular-nums; }

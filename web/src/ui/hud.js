@@ -1,10 +1,11 @@
 // The in-game HUD = CS2's base Panorama HUD for your team (humans are CT): money bottom-left, the
 // health/ammo bar bottom-centre (hudhealthammocenter: armor + health with its bar, the team circle, ammo clip
 // with its bar + reserve), the weapon list bottom-right (hudweaponselection), plus the boss HUD (CS2Fixes
-// BossHUD's text) and our stage line top-left. Built from the game's own layout/styles/SVGs
+// BossHUD's text) and our run panel top-left (ui/hud-run.js). Built from the game's own layout/styles/SVGs
 // (`lasers-bake --panorama`); sizes are its 1080p reference px (scaled by --u in hud.css).
 import './hud.css';
 import { esc, replayClass } from '../lib/dom.js';
+import { RunPanel } from './hud-run.js';
 import { clamp, clamp01 } from '../lib/math.js';
 import { thousands } from '../lib/format.js';
 import { GUNS, PISTOLS, DEFAULT_GUN, DEFAULT_PISTOL, firearm } from '../lib/weapons.js';
@@ -36,7 +37,7 @@ export class Hud {
   constructor(root, { team = 'ct' } = {}) {
     this.root = root;
     root.innerHTML = `
-      <div class="hud-stage"><div class="hud-title"></div><div class="hud-timer"></div><div class="hud-sub"></div></div>
+      <div class="hud-stage"></div>
       <div class="hud-boss"></div>
       <div class="hud-spec"></div>
       <div class="hud-countdown" aria-live="polite"></div>
@@ -77,12 +78,13 @@ export class Hud {
     root.dataset.team = team;
     const q = (s) => root.querySelector(s);
     this.el = {
-      title: q('.hud-title'), timer: q('.hud-timer'), sub: q('.hud-sub'), boss: q('.hud-boss'), spec: q('.hud-spec'), countdown: q('.hud-countdown'), mark: q('.hud-mark'),
+      boss: q('.hud-boss'), spec: q('.hud-spec'), countdown: q('.hud-countdown'), mark: q('.hud-mark'),
       money: q('.money-digits'), ha: q('.hud-ha'), hp: q('.hud-ha-big.hp'), hpBar: q('.hp-bar i'),
       armor: q('.hud-ha-armor'), armorLabel: q('.hud-ha-armor-label'), armorIcon: q('.armor-icon'),
       wpn: q('.hud-wpn-main'), modeIcon: q('.mode-icon'), clip: q('.hud-ha-big.clip'), clipBar: q('.clip-bar i'), reserve: q('.hud-wpn-reserve'),
       ws: q('.hud-ws'), rows: [...root.querySelectorAll('.ws-row')],
     };
+    this.run = new RunPanel(q('.hud-stage'));
     this.last = {};
   }
 
@@ -109,9 +111,7 @@ export class Hud {
   update(v) {
     const e = this.el;
     const set = (k, el, val) => { if (this.last[k] !== val) { this.last[k] = val; el.textContent = val; } };
-    set('title', e.title, v.title || '');
-    set('timer', e.timer, v.timer || '');
-    set('sub', e.sub, v.sub || '');
+    if (v.run) this.run.update(v.run);
     set('spec', e.spec, v.spectate || ''); // dead in a round: who you are watching
     // the stage's countdown (world/run-engine.js COUNTDOWN): 3, 2, 1 big in the middle, each number popping in
     const cd = v.countdown ? String(v.countdown) : '';

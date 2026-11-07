@@ -173,10 +173,9 @@ class Round {
   sendReady() { if (!this.ended) { this.readyIds.add(this.me); net.game({ t: 'ready', r: this.r, ping: simulatedPing() }); } }
   waitLine() { return waitLine(); } // app/coop-load.js: the ready ones among those still in
 
+  // the room's cheats for the HUD's status line (who is alive is the run panel's CO-OP a/n: app/run-panel.js)
   hudLine() {
-    const n = this.players.size, a = this.alive.length;
-    const cheats = [this.rules.god && 'god mode', this.rules.hitboxes && 'hitboxes', this.rules.autoBhop && 'auto bhop'].filter(Boolean);
-    return `Online${n > 1 ? ` · ${a}/${n} alive` : ''}${cheats.length ? ` · ${cheats.join(', ')}` : ''}`;
+    return [this.rules.god && 'god mode', this.rules.hitboxes && 'hitboxes', this.rules.autoBhop && 'auto bhop'].filter(Boolean).join(', ');
   }
 
   // the server says someone died (you too)

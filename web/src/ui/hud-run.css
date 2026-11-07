@@ -1,0 +1,51 @@
+/* The run panel top-left (ui/hud-run.js): a CS2-style blurred strip with a team-colour edge. 1080p px x --u
+   (ui/hud.css); it moves right of the radar when there is one (ui/radar.css). */
+.hud-stage {
+  position: absolute; left: calc(14 * var(--u)); top: calc(14 * var(--u));
+  min-width: calc(250 * var(--u)); max-width: calc(440 * var(--u)); box-sizing: border-box;
+  padding: calc(8 * var(--u)) calc(16 * var(--u)) calc(9 * var(--u)) calc(12 * var(--u));
+  border-left: calc(3 * var(--u)) solid var(--team);
+  background: linear-gradient(90deg, rgba(10, 12, 16, 0.62), rgba(10, 12, 16, 0.38) 70%, rgba(10, 12, 16, 0));
+  backdrop-filter: blur(calc(4 * var(--u))); -webkit-backdrop-filter: blur(calc(4 * var(--u)));
+  --good: #6fdc8c; --bad: #ff6b5e; --gold: #ffd257;
+}
+.hud-stage > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* SOLO / CO-OP 3/4 / REPLAY, then the map */
+.hr-top { display: flex; align-items: center; gap: calc(8 * var(--u)); font: 700 calc(14 * var(--u)) / 1.2 'Stratum2', sans-serif; letter-spacing: 0.08em; text-transform: uppercase; }
+.hr-party { flex: none; padding: calc(1 * var(--u)) calc(6 * var(--u)); border-radius: calc(2 * var(--u)); color: #0b0d10; background: var(--team); text-shadow: none; }
+.hr-party.replay { background: #c9a0ff; }
+.hr-party:empty { display: none; }
+.hr-map { opacity: 0.75; overflow: hidden; text-overflow: ellipsis; }
+
+/* level · stage name · ENDLESS */
+.hr-stage { margin-top: calc(4 * var(--u)); font: 700 calc(19 * var(--u)) / 1.2 'Stratum2', sans-serif; }
+.hr-level { color: var(--team); text-transform: uppercase; letter-spacing: 0.04em; }
+.hr-level:not(:empty)::after { content: '›'; margin: 0 calc(6 * var(--u)); color: rgba(255, 255, 255, 0.45); }
+.hr-tag { margin-left: calc(8 * var(--u)); font-size: 0.7em; letter-spacing: 0.08em; color: var(--gold); vertical-align: middle; }
+
+.hr-timer { margin-top: calc(1 * var(--u)); font: 700 calc(36 * var(--u)) / 1.1 'Stratum2 TF', 'Stratum2', sans-serif; font-variant-numeric: tabular-nums; }
+.hud-stage.waiting .hr-timer { font-size: calc(24 * var(--u)); opacity: 0.85; }
+.hr-timer:empty { display: none; }
+
+/* your best: a bar filling toward it, PB time, the gap */
+.hr-best { display: flex; align-items: center; gap: calc(8 * var(--u)); margin-top: calc(3 * var(--u)); font: 700 calc(15 * var(--u)) / 1.2 'Stratum2', sans-serif; font-variant-numeric: tabular-nums; }
+.hr-best[hidden] { display: none; }
+.hr-bar { position: relative; flex: none; width: calc(90 * var(--u)); height: calc(5 * var(--u)); background: rgba(255, 255, 255, 0.16); overflow: hidden; }
+.hr-bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--team); }
+.hr-pb { opacity: 0.8; }
+.hr-delta { color: var(--good); }
+.hud-stage[data-pb="over"] .hr-bar i { background: var(--bad); }
+.hud-stage[data-pb="over"] .hr-delta, .hud-stage[data-pb="over"] .hr-timer { color: var(--bad); }
+.hud-stage[data-pb="record"] .hr-bar i { background: var(--gold); box-shadow: 0 0 calc(6 * var(--u)) var(--gold); }
+.hud-stage[data-pb="record"] .hr-delta, .hud-stage[data-pb="record"] .hr-timer { color: var(--gold); }
+.hud-stage[data-pb="record"] { border-left-color: var(--gold); }
+/* on pace for a clear: the gap is time still in hand (green); endless, the time still to go (plain) */
+.hud-stage.endless[data-pb="ahead"] .hr-delta { color: rgba(255, 255, 255, 0.7); }
+.hr-best { transform-origin: left center; }
+.hr-best.crossed { animation: hr-crossed 0.7s ease-out; }
+@keyframes hr-crossed { 0% { transform: scale(1.12); filter: brightness(1.8); } 100% { transform: none; filter: none; } }
+@media (prefers-reduced-motion: reduce) { .hr-best.crossed { animation: none; } }
+
+.hr-sub { margin-top: calc(3 * var(--u)); font: 500 calc(15 * var(--u)) / 1.2 'Stratum2', sans-serif; opacity: 0.8; }
+.hr-sub:empty { display: none; }

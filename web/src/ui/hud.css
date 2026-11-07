@@ -91,11 +91,7 @@
 .bh-bar i { display: block; height: 100%; }
 .bh-line { white-space: nowrap; }
 
-/* ---- stage line (ours) ---- */
-.hud-stage { position: absolute; left: calc(20 * var(--u)); top: calc(16 * var(--u)); }
-.hud-title { font: 700 calc(18 * var(--u)) 'Stratum2', sans-serif; letter-spacing: 0.04em; opacity: 0.9; }
-.hud-timer { font: 700 calc(34 * var(--u)) / 1.1 'Stratum2 TF', 'Stratum2', sans-serif; }
-.hud-sub { font: 500 calc(16 * var(--u)) 'Stratum2', sans-serif; opacity: 0.8; }
+/* ---- the run panel (ours): ui/hud-run.css ---- */
 
 /* touch play: the weapon list sits where the thumb buttons are (weapon swap is a button there) */
 body.touch-playing .hud-ws { display: none; }

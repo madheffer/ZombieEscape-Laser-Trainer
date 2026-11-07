@@ -14,9 +14,9 @@ import { startScenario, hurtPlayer, healPlayer, finish, stageTime, landing } fro
 import { startIfDue, mapRuns, winDue, sentOut } from '../world/run-engine.js';
 import { caughtBy } from '../world/caught.js';
 import { bossHudHtml } from '../ui/hud.js';
+import { runPanelData } from './run-panel.js';
 import { playerMark } from './marks.js';
-import { formatTime, plural } from '../lib/format.js';
-import { getRecord } from './records.js';
+import { plural } from '../lib/format.js';
 import { cameraPosition } from './camera.js';
 import { perfFrame } from './perf.js';
 import { pushPlayer, solidMatrices } from '../world/push.js';
@@ -336,16 +336,10 @@ export function updateHud() {
   if (timescale() !== 1) sub.push(`${timescale()}× speed`);
   const mpLine = S.mp?.hudLine();
   if (mpLine) sub.push(mpLine);
-  if (run.endless) {
-    const best = getRecord(S.map.name, scenario.id, 'endless');
-    sub.push(best ? `best ${formatTime(best.time)}` : 'endless');
-  }
   G.hud.update({
-    title: (S.replay ? 'REPLAY · ' : '') + (scenario ? scenario.name + (run.endless ? ' · ENDLESS' : '') : 'Free roam'),
-    timer: scenario ? (t < 0 ? `starts in ${(-t).toFixed(1)}` : formatTime(t)) : '',
+    run: runPanelData(t, sub.join(' · ')), // the top-left panel: solo / co-op, map, level + stage, clock vs your best
     // 3, 2, 1 big in the middle once the clock runs: loaded and drawn, and in a round everyone in (the server's go)
     countdown: scenario && t < 0 && run.ready && (!S.mp || run.go) ? Math.ceil(-t - 1e-6) : 0,
-    sub: sub.join(' · '),
     hp: run.spectating ? (S.mp?.spectateView()?.hp ?? 0) : run.hp, god: godMode(), armor: run.armor, money: run.money,
     spectate: run.spectating ? S.mp?.spectateLabel() : '',
     weapon: G.vm.weapon, gun: G.vm.gunName, held: G.vm.held?.name, clip: G.vm.clip, reserve: G.vm.reserve, reloading: G.vm.reloading,
