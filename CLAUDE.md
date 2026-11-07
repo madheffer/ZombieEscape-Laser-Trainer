@@ -59,7 +59,8 @@ dotnet build bake -c Release        # then see README "Run it locally" for the b
   (`npm run dev:stable --prefix web`, .claude/launch.json "web-stable"): nothing on it reloads by itself, so other
   sessions' edits never cut a test short; reload the page to pick up edits. Don't test on :5804 (the hot-reloading dev
   server), don't start copies on other ports and don't stop servers other sessions started. If :5807 is down, start it.
-  `window.__lasers` is the debug handle: `startScenario(i, mode)`, `pause()` (assigning `.paused` does nothing), `advance(seconds)` (synchronous sim; a hidden
+  `window.__lasers` is the debug handle: `startScenario(i, mode)`, `pause()` (assigning `.paused` does nothing), `unpause()` (live
+  frames without the pointer lock, for profiling: mute first), `advance(seconds)` (synchronous sim; a hidden
   tab gets no animation frames), `scenarios()`, `engine`, `player`, `run`, `settings`, `audio`, `vm`;
   `window.__lasersInput = (t) => ({forward, side, jump, duck, walk})` drives the player. Tests in the user's Chrome
   are audible: keep the game paused (solo audio is silent while paused; a live round's plays on behind the menu, so

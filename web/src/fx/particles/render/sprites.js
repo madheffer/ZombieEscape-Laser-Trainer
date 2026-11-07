@@ -3,6 +3,7 @@ import { createSpritecardMaterial, applyControls, bindTextures, whiteTexture } f
 import { spritecardControls, makeInputs, normalizeRef } from './controls.js';
 import { colorBlend } from './barn.js';
 import { sheetSample } from './basis.js';
+import { uploadRange } from './upload.js';
 
 // C_OP_RenderSprites: one instanced quad per live particle, rebuilt from the attribute streams each frame. The
 // vertex shader (spritecard.js SPRITE_VS) does orientation, roll/yaw, size limits and gamma; this side fills the
@@ -15,6 +16,7 @@ const LAYOUT = {
   iL1a: 4, iL1b: 4, iL2a: 4, iL2b: 4, iL3a: 4, iL3b: 4, iLBlend: 3, // texture layers 1-3: frame rects, blend (VSL)
   iMa: 4, iMb: 4, // the motion-vector texture's frame rects
 };
+const LAYOUT_NAMES = Object.keys(LAYOUT);
 
 export class SpriteRenderer {
   constructor(shared, assets) {
@@ -120,7 +122,7 @@ export class SpriteRenderer {
       const ms = mvSheet ? sheetSample(mvSheet, seq, t, rate, inFps, sm) : s;
       if (ms) { g.iMa.setXYZW(j, ms.rect0[0], ms.rect0[1], ms.rect0[2], ms.rect0[3]); g.iMb.setXYZW(j, ms.rect1[0], ms.rect1[1], ms.rect1[2], ms.rect1[3]); }
     }
-    for (const name of Object.keys(LAYOUT)) g[name].needsUpdate = true;
+    for (const name of LAYOUT_NAMES) uploadRange(g[name], n * LAYOUT[name]); // the live instances, not the whole capacity
     this.geometry.instanceCount = n;
     this.mesh.visible = n > 0;
     return ctl;

@@ -3,6 +3,7 @@ import { createSpritecardMaterial, applyControls, bindTextures, whiteTexture } f
 import { spritecardControls, makeInputs } from './controls.js';
 import { colorBlend, srgbToLinear, smoothstep } from './barn.js';
 import { ropeV, vec } from './basis.js';
+import { uploadRange as upload } from './upload.js';
 
 // C_OP_RenderRopes / C_OP_RenderTrails: the spritecard trail combo (S_DRAW_AS_TRAIL=1, RE §6) tessellated on the
 // CPU from basis.js, so the strip drawn is the one node tests check. Particles join in collection order
@@ -17,12 +18,6 @@ export function setRopeDetail(full) { SEGMENTS = full ? 8 : 3; }
 // basis.js catmullRom / catmullRomTangent for one component (the same expressions; t2 = t^2, t3 = t^3)
 const cmr = (a, b, c, d, t, t2, t3) => 0.5 * (2 * b + (c - a) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (3 * b - a - 3 * c + d) * t3);
 const cmrT = (a, b, c, d, t, t2) => 0.5 * (c - a) + (2 * a - 5 * b + 4 * c - d) * t + 1.5 * (3 * b - a - 3 * c + d) * t2;
-// mark the first n values of a buffer attribute for upload
-function upload(attr, n) {
-  attr.clearUpdateRanges();
-  attr.addUpdateRange(0, n);
-  attr.needsUpdate = true;
-}
 
 export class RopeRenderer {
   constructor(shared, assets) {

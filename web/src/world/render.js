@@ -624,7 +624,8 @@ export class Renderer {
     for (const [e, g] of this.visuals) {
       const inst = g.userData.fx;
       if (!inst) continue;
-      inst.update(dt, { cps: this.controlPoints(e, g), active: !!(e.alive && e.state.active), camPos, frustum });
+      // seen: drawn last frame (updateEntities: alive, visible, in the view box, not occluded), for its sleep
+      inst.update(dt, { cps: this.controlPoints(e, g), active: !!(e.alive && e.state.active), camPos, frustum, seen: g.visible });
       inst.group.visible = e.visible !== false;
     }
   }

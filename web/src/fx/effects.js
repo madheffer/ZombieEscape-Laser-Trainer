@@ -256,11 +256,13 @@ export class MapEffects {
 // the largest radius (field 3) and a margin, for the sprite's own size, its stretch and the roll of its quad.
 // No frustum: always.
 const CULL_MARGIN = 128;
-const _box = new THREE.Box3();
-function collectionInView(col, frustum) {
-  if (!frustum) return true;
-  const P = col.attr?.[0], R = col.attr?.[3], n = col.count || 0;
-  if (!P) return true;
+const _box = new THREE.Box3(), _wake = new THREE.Box3(), _v = new THREE.Vector3();
+// The padded box around a collection's particles (attribute `field`: 0 position, 2 previous position) into `box`;
+// false with no particles, no such stream or a NaN position (then nothing can be ruled out). tight: padded by the
+// largest radius only (the bounds the draw distance is measured to).
+function collectionBox(col, box, field = 0, tight = false) {
+  const P = col.attr?.[field], R = col.attr?.[3], n = col.count || 0;
+  if (!P || !n) return false;
   let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity, r = 0;
   for (let i = 0; i < n; i++) {
     const x = P[3 * i], y = P[3 * i + 1], z = P[3 * i + 2];
@@ -269,11 +271,34 @@ function collectionInView(col, frustum) {
     if (z < z0) z0 = z; if (z > z1) z1 = z;
     if (R && R[i] > r) r = R[i];
   }
-  if (!Number.isFinite(x0 + x1 + y0 + y1 + z0 + z1)) return true; // a NaN position: drawn as before
-  const pad = 4 * (Number.isFinite(r) ? r : 0) + CULL_MARGIN;
-  _box.min.set(x0 - pad, y0 - pad, z0 - pad);
-  _box.max.set(x1 + pad, y1 + pad, z1 + pad);
-  return frustum.intersectsBox(_box);
+  if (!Number.isFinite(x0 + x1 + y0 + y1 + z0 + z1)) return false;
+  const rr = Number.isFinite(r) ? r : 0, pad = tight ? rr : 4 * rr + CULL_MARGIN;
+  box.min.set(x0 - pad, y0 - pad, z0 - pad);
+  box.max.set(x1 + pad, y1 + pad, z1 + pad);
+  return true;
+}
+function collectionInView(col, frustum) {
+  if (!frustum || !col.attr?.[0]) return true;
+  return !collectionBox(col, _box) || frustum.intersectsBox(_box); // a NaN position: drawn as before
+}
+// every collection's particles, now and a step back (a trail reaches back along the motion), into `box`
+function particleBox(cols, box) {
+  box.makeEmpty();
+  for (const col of cols) for (const field of [0, 2]) if (collectionBox(col, _box, field)) box.union(_box);
+  return box;
+}
+
+// m_flMaxDrawDistance (the root definition's; particles.dll's default -1: no limit; 888 of the baked systems set
+// 100000, ~100 set 800-8000): past it the effect is not drawn. Measured from the camera to the bounds of all its
+// particles, root only, as Source's CNewParticleEffect::DrawModel does (CalcSqrDistanceToAABB against
+// m_flMaxDrawDistance^2). UNSETTLED: CS2's own test is not traced; this is Source 1's.
+const _far = new THREE.Box3();
+function beyondDrawDistance(sys, camPos) {
+  const max = +(sys.root?.def?.m_flMaxDrawDistance ?? -1);
+  if (!(max > 0)) return false;
+  _far.makeEmpty();
+  for (const col of sys.collections || []) if (collectionBox(col, _box, 0, true)) _far.union(_box);
+  return !_far.isEmpty() && _far.distanceToPoint(_v.set(camPos[0], camPos[1], camPos[2])) > max;
 }
 
 export class EffectInstance {
@@ -297,7 +322,9 @@ export class EffectInstance {
   // frustum: the camera's (THREE.Frustum); sprites and ropes wholly outside it skip building their buffers and are not
   // drawn (they still simulate, so what they do is unchanged). prepare: build every renderer and its material whatever
   // is live or seen (render.js compiles the effect's shaders from that before it is shown)
-  update(dt, { cps = [], active = true, camPos = [0, 0, 0], frustum = null, prepare = false } = {}) {
+  // seen: whether the entity drawing it was drawn last frame (render.js: its view box, occlusion, fade)
+  update(dt, { cps = [], active = true, camPos = [0, 0, 0], frustum = null, prepare = false, seen = true } = {}) {
+    if (!prepare && this._asleep(active, cps, frustum, seen)) return;
     // A start plays from this frame on; a stop came at the end of the time this frame covers, so that time still runs
     // with emission on (a fresh instance that was never on stops before its first step). Westersand's Chaos_Tesla gets
     // Stop 0.5 s after Start, the frame its beams restart (tesla_beam_mainc C_OP_RestartAfterDuration 0.5) and fire
@@ -314,6 +341,7 @@ export class EffectInstance {
     if (stopping) { this.sys.stopEmission(); this.active = false; }
     for (const m of this.sys.reports.splice(0)) this.effects.report(m);
     const cols = this.sys.collections || [];
+    const far = !prepare && beyondDrawDistance(this.sys, camPos);
     this.lights.length = 0;
     // children draw first, then the root
     for (let ci = cols.length - 1, order = 0; ci >= 0; ci--) {
@@ -344,8 +372,9 @@ export class EffectInstance {
           return;
         }
         if (!rend.mesh) return;
-        // nothing of it can be on screen: its buffers wait for the frame it can (trails and models are left alone: a
-        // streak reaches back along the velocity, a model has its own size)
+        if (far) { rend.mesh.visible = false; return; } // past m_flMaxDrawDistance (beyondDrawDistance)
+        // nothing of it can be on screen: its buffers wait for the frame it can (a trail checks its own streaks'
+        // ends, which reach back along the velocity: render/trails.js; a model has its own size)
         if (!prepare && (rend instanceof SpriteRenderer || rend instanceof RopeRenderer) && !(col.count > 0 && collectionInView(col, frustum))) {
           rend.mesh.visible = false;
           return;
@@ -358,10 +387,34 @@ export class EffectInstance {
         // through walls and floors, which they don't in game. m_bDisableZBuffering still turns the test off.
         const overlay = !!(r.p?.m_bOnlyRenderInEffecsGameOverlay ?? raw.m_bOnlyRenderInEffecsGameOverlay);
         rend.mesh.renderOrder = (overlay ? OVERLAY_ORDER : 0) + order++;
-        const ctl = rend.update(col, r.p, raw, { camPos, report: (m) => this.effects.report(m) }, r.cls);
+        const ctl = rend.update(col, r.p, raw, { camPos, frustum: prepare ? null : frustum, report: this._report ||= (m) => this.effects.report(m) }, r.cls);
         for (const u of ctl?.unsupported || []) this.effects.report(`${r.cls}: ${u}`);
       });
     }
+    // drawn this frame: a mesh of it on screen, or a renderer that acts unseen (a light, a sound, a model)
+    if (!seen) return;
+    for (const rend of this.renderers.values()) {
+      if (rend.mesh?.visible || rend instanceof LightRenderer || rend instanceof SoundRenderer || rend instanceof ModelRenderer) { this.drawnAt = this.time; break; }
+    }
+  }
+
+  // CS2's sleep (CParticleSystemDefinition m_flNoDrawTimeToGoToSleep, particles.dll's default 8 s: defaults.js): a
+  // system nothing has drawn for that long stops simulating, frozen as it is, until it could be seen again: its frozen
+  // particles' box or one of its control points inside the view. Its Start / Stop still reach it (they wake it). Not
+  // judged without a frustum (nothing to see it with), and a system with a light, sound or model renderer never
+  // sleeps (drawnAt follows the clock). A map's systems beyond the play area cost nothing this way.
+  // UNSETTLED: the wake test (bounds vs view) and that the sleeping clock stops are Source's rules, not traced in CS2.
+  _asleep(active, cps, frustum, seen) {
+    const after = this.sleepAfter ??= +(this.sys.root?.def?.m_flNoDrawTimeToGoToSleep ?? 8);
+    this.drawnAt ??= 0;
+    if (!frustum || !(after > 0) || active !== this.active || this.time - this.drawnAt <= after) { this._sleepBox = null; return false; }
+    const box = this._sleepBox ||= particleBox(this.sys.collections || [], new THREE.Box3());
+    _wake.copy(box);
+    for (const cp of cps) if (cp?.position) _wake.expandByPoint(_v.set(cp.position[0], cp.position[1], cp.position[2]));
+    if (_wake.isEmpty() || !seen || !frustum.intersectsBox(_wake.expandByScalar(CULL_MARGIN))) return true;
+    this.drawnAt = this.time; // awake: a full sleep time before it can doze off again
+    this._sleepBox = null;
+    return false;
   }
 
   // nothing left to draw and no longer emitting

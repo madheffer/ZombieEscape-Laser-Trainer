@@ -21,6 +21,17 @@ export function srgbToLinear(v) {
   return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
 }
 
+// The same curve from a table, linearly interpolated (within 1e-7 of srgbToLinear; NaN gives 0): the trail / rope builders convert
+// every vertex colour of every frame, and Math.pow there was a tenth of a heavy boss attack's frame.
+const SRGB_STEPS = 4096;
+const SRGB_LUT = Float64Array.from({ length: SRGB_STEPS + 2 }, (_, i) => srgbToLinear(Math.min(i, SRGB_STEPS) / SRGB_STEPS));
+export function srgbToLinearFast(v) {
+  if (!(v > 0)) return 0;
+  if (v >= 1) return 1;
+  const x = v * SRGB_STEPS, i = x | 0;
+  return SRGB_LUT[i] + (SRGB_LUT[i + 1] - SRGB_LUT[i]) * (x - i);
+}
+
 // Luminance weights. RecalculateDerivedValues (0x1803774b0) uses 0x180468a00/08/1804689fc = Rec.709; the render
 // function's desaturation and LUMINANCE blend use 0x1805341a4/c0/190 = 0.2125, 0.7154, 0.0721.
 export const lum709 = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];

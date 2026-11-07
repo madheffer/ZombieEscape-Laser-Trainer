@@ -206,13 +206,18 @@ export const operators = {
     op(fn, c, s) {
       const out = attrIndex(fn.m_nFieldOutput, A.COLOR);
       const fade = (fn.m_ColorFade || [255, 255, 255]).map((x) => x / 255);
+      // lerp3(c0, lerp3(c0, fade, u), s) on plain numbers (the same sums; no arrays per particle)
+      const O = c.attr[out], I = c.init[A.COLOR];
+      if (!O) return;
       for (let i = 0; i < c.count; i++) {
         const t = nage(c, i);
         if (t < fn.m_flFadeStartTime || t > fn.m_flFadeEndTime) continue;
         let u = sat((t - fn.m_flFadeStartTime) / (fn.m_flFadeEndTime - fn.m_flFadeStartTime));
         if (fn.m_bEaseInOut) u = u * u * (3 - 2 * u);
-        const c0 = getInitV(c, A.COLOR, i);
-        setV(c, out, i, lerp3(c0, lerp3(c0, fade, u), s));
+        for (let k = 0; k < 3; k++) {
+          const c0 = I ? I[3 * i + k] : 0;
+          O[3 * i + k] = c0 + (c0 + (fade[k] - c0) * u - c0) * s;
+        }
       }
     },
   },
@@ -375,9 +380,13 @@ export const operators = {
   },
 };
 
+// the field names per k, made once (this runs per particle per frame: no strings built there)
+const FADE_KEYS = new Map();
+const fadeKeys = (k) => FADE_KEYS.get(k) || (FADE_KEYS.set(k, [`${k}Min`, `${k}Max`, `${k}Exp`]), FADE_KEYS.get(k));
 const fadeTime = (fn, c, i, k) => {
-  const lo = fn[`${k}Min`], hi = fn[`${k}Max`];
+  const [kMin, kMax, kExp] = fadeKeys(k);
+  const lo = fn[kMin], hi = fn[kMax];
   if (lo === hi) return lo;
-  return lo + (hi - lo) * Math.pow(drawConstant(c, 0, c.attr[A.ID][i]), fn[`${k}Exp`] ?? 1);
+  return lo + (hi - lo) * Math.pow(drawConstant(c, 0, c.attr[A.ID][i]), fn[kExp] ?? 1);
 };
 

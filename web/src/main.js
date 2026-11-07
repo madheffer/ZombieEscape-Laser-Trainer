@@ -482,6 +482,7 @@ window.__lasers = {
   // solo only: a co-op / versus round runs on the server's clock
   // tests: pause so the map stays silent and only advance() moves time (assigning .paused does nothing)
   pause: () => G.pause(),
+  unpause: () => G.unpause(), // profiling: live frames without the pointer lock (mute first: audio.setVolumes)
   buyWeapon, // app/buy.js: buyWeapon('bizon' | 'weapon_ak47' | '!m4a1' ...)
   advance(seconds) { if (S.mp) return 'solo only'; for (let i = 0; i < Math.round(seconds / CS.tick); i++) { if (!S.run || S.run.done) break; step(); } updateHud(); },
 };

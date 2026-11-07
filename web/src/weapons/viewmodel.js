@@ -70,6 +70,7 @@ export class Viewmodel {
     this._sources = {};                          // 'gun' | 'pistol' | 'knife' -> the FpSource on screen for that slot
     this._chassis = new Map();                   // chassis -> Promise<FpSource> (each loads once)
     this._loaded = new Set();                    // the FpSources in the scene
+    this._cold = new Set();                      // loaded but never drawn: their textures / buffers not on the GPU yet
     this.gunName = DEFAULT_GUN;                  // the primary (lib/weapons.js GUNS)
     this.pistolName = DEFAULT_PISTOL;            // the secondary (lib/weapons.js PISTOLS)
     this._clips = { gun: this.gun.clip, pistol: this.pistol.clip }; // each gun keeps its own magazine
@@ -150,6 +151,7 @@ export class Viewmodel {
         s.group.visible = false;
         this.scene.add(s.group);
         this._loaded.add(s);
+        this._cold.add(s);                         // drawn once unseen at the next render (_warm)
         return s;
       });
       p.catch(() => this._chassis.delete(chassis)); // a failed load can be tried again
@@ -379,6 +381,27 @@ export class Viewmodel {
     cam.rotateX(-(this._lagPitch * D));
   }
 
+  // A weapon's first draw uploads its textures and buffers (and makes the driver finish its shaders): ~15 textures
+  // in that one frame, the spike of a first switch or a buy. So each viewmodel is drawn once as soon as it has
+  // loaded, hidden behind an empty scissor box: every draw call goes through (uploads, program link) and no pixel
+  // is written. Drawn to the real target, so the programs are the ones the visible draw uses.
+  _warm(cam) {
+    const r = this.renderer;
+    const shown = [...this._loaded].filter((s) => s.group.visible);
+    for (const s of this._loaded) s.group.visible = this._cold.has(s);
+    const culled = [];
+    for (const s of this._cold) s.group.traverse((o) => { if (o.frustumCulled) { culled.push(o); o.frustumCulled = false; } });
+    const test = r.getScissorTest(), box = r.getScissor(new THREE.Vector4());
+    r.setScissorTest(true);
+    r.setScissor(0, 0, 0, 0);
+    r.render(this.scene, cam);
+    r.setScissor(box);
+    r.setScissorTest(test);
+    for (const o of culled) o.frustumCulled = true;
+    for (const s of this._loaded) s.group.visible = shown.includes(s);
+    this._cold.clear();
+  }
+
   render(aspect) {
     if (!this.visible || !this.ready || !this.renderer) return;
     const s = this._sources[this.weapon];
@@ -389,10 +412,11 @@ export class Viewmodel {
     s.updateCamera(cam);                         // sets fov + projection, places the eye at root_motion
     this._applyMotion(cam);
     cam.updateMatrixWorld();
-    this._placeParticleLights(cam);
+    this._placeParticleLights(cam);              // patches new materials first: the warm draw compiles the final shaders
     const r = this.renderer;
     const auto = r.autoClear;
     r.autoClear = false;
+    if (this._cold.size) this._warm(cam);
     r.clearDepth();
     r.render(this.scene, cam);
     r.autoClear = auto;

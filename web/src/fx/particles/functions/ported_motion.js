@@ -143,11 +143,20 @@ export const ported_motion = {
       let k = normOr(evalVec(fn.m_vecRotAxis, c, -1), [0, 0, 1]);
       if (fn.m_bLocalSpace) k = toWorld(tr, k);
       const C = tr.position;
-      for (let i = 0; i < c.count; i++) {
-        for (const a of [A.POSITION, A.PREV]) {
-          const p = getV(c, a, i);
-          const t = add(C, rotateAboutAxis(k, ang, sub(p, C)));
-          setV(c, a, i, add(p, mul(sub(t, p), s)));
+      // rotateAboutAxis's matrix, built once (the axis and angle are the same for every particle), then p + (C + M (p - C)
+      // - p) * s on plain numbers: the same sums as add / sub / mul, without arrays per particle
+      const a = ang * DEG2RAD, sn = Math.sin(a), co = Math.cos(a), t = 1 - co, [x, y, z] = k;
+      const m00 = x * x * t + co, m01 = x * y * t - z * sn, m02 = x * z * t + y * sn;
+      const m10 = x * y * t + z * sn, m11 = y * y * t + co, m12 = y * z * t - x * sn;
+      const m20 = x * z * t - y * sn, m21 = y * z * t + x * sn, m22 = z * z * t + co;
+      const C0 = C[0], C1 = C[1], C2 = C[2];
+      for (const P of [c.attr[A.POSITION], c.attr[A.PREV]]) {
+        for (let i = 0, j = 0; i < c.count; i++, j += 3) {
+          const p0 = P[j], p1 = P[j + 1], p2 = P[j + 2];
+          const v0 = p0 - C0, v1 = p1 - C1, v2 = p2 - C2;
+          P[j] = p0 + (C0 + (m00 * v0 + m01 * v1 + m02 * v2) - p0) * s;
+          P[j + 1] = p1 + (C1 + (m10 * v0 + m11 * v1 + m12 * v2) - p1) * s;
+          P[j + 2] = p2 + (C2 + (m20 * v0 + m21 * v1 + m22 * v2) - p2) * s;
         }
       }
     },
