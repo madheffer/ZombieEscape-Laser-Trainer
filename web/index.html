@@ -104,7 +104,7 @@
                   <span class="pair"><input id="gamma" type="range" min="1" max="2.5" step="0.05"><span class="num"><input id="gamma-num" type="number" min="1" max="2.5" step="0.05" inputmode="decimal"></span></span>
                 </label>
                 <label class="chk"><input id="perfmeter" type="checkbox"><span>Show FPS and ping</span></label>
-                <label class="chk"><input id="fpsuncapped" type="checkbox"><span>Uncapped FPS <small>Less input lag; your screen still shows its refresh rate</small></span></label>
+                <label class="field inline-field">Max FPS <small>Higher is less input lag</small><select id="fpsmax"><option value="0">Unlimited</option><option value="-1">Screen refresh</option><option value="60">60</option><option value="120">120</option><option value="144">144</option><option value="165">165</option><option value="240">240</option><option value="360">360</option></select></label>
                 <label class="chk"><input id="minimap" type="checkbox"><span>Minimap <small>CS2's radar, on maps with an overview</small></span></label>
                 <label class="chk"><input id="showlegs" type="checkbox"><span>Show your legs <small>Look down in first person</small></span></label>
                 <label class="chk"><input id="thirdperson" type="checkbox"><span>Third person <small>CS2Fixes <code>!tp</code></small></span></label>

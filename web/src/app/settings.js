@@ -33,7 +33,8 @@ export const DEFAULTS = {
   thirdPerson: false, tpDist: 65,
   showLegs: true, // your body under you in first person, as CS2 draws it (world/body.js); off = no legs at all
   perfMeter: true, // the FPS (and in a room, ping) readout top right (ui/perf-meter.js)
-  fpsUncapped: false, // frames while playing aren't held to the monitor's refresh (app/loop.js scheduleFrame)
+  // CS2's fps_max while playing (app/loop.js scheduleFrame): 0 no limit, n at most n a second, -1 the display's refresh
+  fpsMax: 0,
   minimap: true, // CS2's radar top left (ui/radar.js), on maps that ship an overview
   gamma: 2,
   // performance (Video): render resolution (x the screen's pixel ratio, capped at 2), MSAA, and the CS2 lighting
@@ -56,9 +57,10 @@ export const DEFAULTS = {
 // Allowed range per numeric setting; a saved value outside it is clamped (the menu can't produce one).
 export const RANGES = {
   sens: [0.001, 100], timescale: [0.01, 4], humans: [1, 64], bossHp: [1, 100], ping: [0, 500],
-  master: [0, 1], sfx: [0, 1], music: [0, 1], voice: [0, 1], tpDist: [15, 150], gamma: [1, 2.5], renderScale: [0.25, 1], pixelCap: [0.5, 3], quality: [0, 3], streamDistance: [0, 2], touchSens: [0.2, 3], ultimaAt: [0, 300],
+  master: [0, 1], sfx: [0, 1], music: [0, 1], voice: [0, 1], tpDist: [15, 150], gamma: [1, 2.5], renderScale: [0.25, 1], pixelCap: [0.5, 3], quality: [0, 3], streamDistance: [0, 2], fpsMax: [-1, 1000], touchSens: [0.2, 3], ultimaAt: [0, 300],
 };
-const DROPPED = new Set(['myaw', 'fov', 'stamina', 'volume']);
+// fpsUncapped (off by default) became fpsMax (no limit by default): everyone starts uncapped
+const DROPPED = new Set(['myaw', 'fov', 'stamina', 'volume', 'fpsUncapped']);
 // string settings: one of these values
 const CHOICES = { graphics: ['low', 'medium', 'high', 'custom'], ultimaItem: ['none', 'hold', 'auto'] };
 const FORBIDDEN = new Set(['__proto__', 'constructor', 'prototype']);
@@ -131,14 +133,21 @@ export function bindSettings(onChange) {
   const bind = (id, key, label) => {
     const el = $(id);
     if (!el) return;
-    if (el.type === 'checkbox') el.checked = !!settings[key]; else el.value = settings[key];
+    const put = () => {
+      if (el.type === 'checkbox') { el.checked = !!settings[key]; return; }
+      // a select given a value it has no option for (the console's fps_max 200): that value gets one
+      const v = String(settings[key]);
+      if (el.tagName === 'SELECT' && ![...el.options].some((o) => o.value === v)) el.add(new Option(v, v));
+      el.value = v;
+    };
+    put();
     const out = $(id + '-v');
     const show = () => {
       if (!out) return;
       out.textContent = label ? label(settings[key]) : PERCENT.has(key) ? `${Math.round(settings[key] * 100)}%` : settings[key];
     };
     show();
-    redraws.push(() => { if (el.type === 'checkbox') el.checked = !!settings[key]; else el.value = settings[key]; show(); });
+    redraws.push(() => { put(); show(); });
     el.addEventListener('input', () => {
       if (el.type === 'checkbox') settings[key] = el.checked;
       else { const v = Number(el.value); if (Number.isFinite(v)) settings[key] = RANGES[key] ? clamp(v, ...RANGES[key]) : v; }
@@ -155,7 +164,7 @@ export function bindSettings(onChange) {
   syncHumans(); $('#fixedhumans')?.addEventListener('input', syncHumans);
   bind('#autofire', 'autoFire'); bind('#falldmg', 'fallDamage');
   bind('#fullscreen', 'fullscreen'); bind('#perfectteam', 'perfectTeam');
-  bind('#thirdperson', 'thirdPerson'); bind('#showlegs', 'showLegs'); bind('#touchcrouch', 'touchCrouch'); bind('#minimap', 'minimap'); bind('#perfmeter', 'perfMeter'); bind('#fpsuncapped', 'fpsUncapped');
+  bind('#thirdperson', 'thirdPerson'); bind('#showlegs', 'showLegs'); bind('#touchcrouch', 'touchCrouch'); bind('#minimap', 'minimap'); bind('#perfmeter', 'perfMeter'); bind('#fpsmax', 'fpsMax');
   bind('#touchsens', 'touchSens', (v) => `${v.toFixed(1)}×`);
   bindPair('#ping', '#ping-num', 'ping', 0, 500, onChange);
   bindPair('#tpdist', '#tpdist-num', 'tpDist', 15, 150, onChange);

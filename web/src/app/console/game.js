@@ -52,8 +52,8 @@ export function registerGame({ net, restart, openMap, leaveRun }) {
   settingCvar('snd_voipvolume', 'voice', { help: 'Voice volume' });
   settingCvar('r_fullscreen_gamma', 'gamma', { help: 'Screen Gamma (lower is brighter; CS2\'s default is 2.2)' });
   settingCvar('cl_showfps', 'perfMeter', { help: 'Draw fps meter at top of screen (1 = fps, and ping in a room)', type: 'int', min: 0, max: 1, to: (v) => v > 0, from: (v) => (v ? 1 : 0) });
-  // a page has two frame pacings: held to the display's refresh, or none (app/loop.js scheduleFrame)
-  settingCvar('fps_max', 'fpsUncapped', { help: 'Frame rate limiter. 0=no limit; anything else = the display\'s refresh rate.', type: 'int', min: 0, max: 1000, to: (v) => v === 0, from: (v) => (v ? 0 : 1) });
+  // app/loop.js scheduleFrame; the menu's "Screen refresh" is -1 here
+  settingCvar('fps_max', 'fpsMax', { help: 'Frame rate limiter. 0=no limit; -1=the display\'s refresh rate.', type: 'int' });
   settingCvar('cam_idealdist', 'tpDist', { help: 'Third person camera distance (CS2Fixes\' default 65)' });
   settingCvar('sv_autobunnyhopping', 'autoBhop', { help: 'Players automatically re-jump while holding jump button', type: 'bool', flags: ['cheat'] });
   settingCvar('host_timescale', 'timescale', { help: 'Game speed, solo (T toggles 0.25)', flags: ['cheat'] });

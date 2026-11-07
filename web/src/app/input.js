@@ -206,12 +206,13 @@ export function installInput(canvas, actions) {
     if (ev.button === 2) G.vm.trigger2(false);
   });
   document.addEventListener('contextmenu', (ev) => { if (S.locked) ev.preventDefault(); });
-  // Uncapped FPS (app/loop.js): pointerrawupdate, which the browser sends as the mouse reports instead of once per screen
-  // refresh as it does mousemove, so frames drawn between refreshes see the newest aim. One of the two counts, never both.
+  // Max FPS off the display's refresh (settings.fpsMax >= 0, app/loop.js): pointerrawupdate, which the browser sends as
+  // the mouse reports instead of once per screen refresh as it does mousemove, so frames drawn between refreshes see the
+  // newest aim. One of the two counts, never both.
   const raw = 'onpointerrawupdate' in window;
   const mouseLook = (ev, isRaw) => {
     if (!document.pointerLockElement || chatOpen()) return; // typing in the chat: no mouse look
-    if ((raw && settings.fpsUncapped) !== isRaw) return;
+    if ((raw && settings.fpsMax >= 0) !== isRaw) return;
     const k = settings.sens * M_YAW; // CS2: degrees per count = sensitivity * m_yaw (m_pitch = m_yaw)
     look(ev.movementX * k, ev.movementY * k);
   };

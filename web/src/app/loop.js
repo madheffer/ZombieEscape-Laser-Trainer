@@ -94,21 +94,29 @@ const PAUSED_FRAME_MS = 100;
 let lastPausedDraw = -Infinity;
 export let lastFrameAt = 0; // app/coop.js keeps a round going when frames stop (hidden or throttled tab)
 
-// Settings › Display "Uncapped FPS" (settings.fpsUncapped): while playing, the next frame starts as soon as this one is
-// drawn (a MessageChannel task, which requestAnimationFrame's hold to the monitor's refresh doesn't apply to), as CS2's
-// fps_max 0. The screen still shows one frame per refresh, the newest, so it cuts input lag (app/input.js reads the
-// mouse unaligned then) rather than adding frames you can see. Paused, hidden, no run: the refresh-rate loop again.
+// Settings › Display "Max FPS" (settings.fpsMax, CS2's fps_max): 0 = no limit, n = at most n a second, -1 = held to
+// the display's refresh (requestAnimationFrame). Off the refresh, while playing the next frame starts as soon as this
+// one is drawn (a MessageChannel task, which requestAnimationFrame's hold to the refresh doesn't apply to). The screen
+// still shows one frame per refresh, the newest, so it cuts input lag (app/input.js reads the mouse unaligned then)
+// rather than adding frames you can see. Paused, hidden, no run: the refresh-rate loop again.
 // At most MAX_FPS (the viewmodel's update takes 1 ms steps at the least: G.vm.update below).
 const MAX_FPS = 1000;
+let due = 0; // when a capped frame may start: steps of 1000 / cap, so the average is the cap and not a little under
 const nextFrame = new MessageChannel();
 nextFrame.port1.onmessage = () => {
   const now = performance.now();
-  if (now - lastFrameAt < 1000 / MAX_FPS) { nextFrame.port2.postMessage(0); return; }
+  const wait = due - now;
+  // a long wait sleeps on a timer (a spin would hold a CPU core); the last few ms spin, which a timer can't time
+  if (wait > 6) { setTimeout(() => nextFrame.port2.postMessage(0), wait - 4); return; }
+  if (wait > 0) { nextFrame.port2.postMessage(0); return; }
+  const step = 1000 / Math.min(settings.fpsMax || MAX_FPS, MAX_FPS);
+  // a late frame lets the next one start early, at most one step's worth: the average holds, no burst after a stall
+  due = Math.max(due + step, now - step);
   frame(now);
 };
-const uncapped = () => settings.fpsUncapped && !!S.run && !S.paused && !document.hidden;
+const offRefresh =() => settings.fpsMax >= 0 && !!S.run && !S.paused && !document.hidden;
 function scheduleFrame() {
-  if (uncapped()) nextFrame.port2.postMessage(0);
+  if (offRefresh()) nextFrame.port2.postMessage(0);
   else requestAnimationFrame(frame);
 }
 // the listener (and every 3D voice's gain / pan with it) moves at most this often: an uncapped loop would otherwise
