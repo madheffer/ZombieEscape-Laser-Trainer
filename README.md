@@ -425,7 +425,7 @@ The window can be dragged and resized; where it sits and the last 50 lines you r
   names get engine2.dll's `Unknown command '%s'!`. The list shows matches as you type (names starting with it, then
   containing it, each convar's value); Tab / Shift+Tab step through them, filling the entry as CS2's does; Tab on a
   finished name goes on to its arguments (map names, stage ids, guns, 0 / 1). Up / Down walk the history.
-- **Convars**: `sensitivity`, `volume`, `snd_musicvolume`, `snd_voipvolume`, `r_fullscreen_gamma`, `cl_showfps`,
+- **Convars**: `sensitivity`, `volume` / `snd_sfxvolume` (both the SFX slider), `snd_musicvolume`, `snd_voipvolume`, `r_fullscreen_gamma`, `cl_showfps`,
   `fps_max` (0 = uncapped, else the display's refresh), `cam_idealdist`, `m_yaw` / `m_pitch` (read only),
   `sv_autobunnyhopping`, `host_timescale`, `c_simulated_ping` (the simulated ping the lag compensation allows for: the
   same value as Settings › Game and the room screen's slider, both redrawn and the room told; it reads the ping in
