@@ -283,7 +283,7 @@ export class RoomScreen {
     return li;
   }
 
-  // a card picks Normal, its ∞ Endless (the bottom bar's Normal / Endless switches it after)
+  // a card picks Normal, its Endless button Endless (the bottom bar's Normal / Endless switches it after)
   pickStage(map, stage, mode = 'normal') { this.net.pick(map, stage, mode); }
 
   setMode(mode) {

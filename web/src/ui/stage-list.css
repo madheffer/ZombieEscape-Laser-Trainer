@@ -88,8 +88,12 @@
 .sl-tool:hover { color: var(--text); border-color: #3b4c60; background: rgba(255, 255, 255, 0.07); }
 .sl-tool:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .sl-tool.info { border-radius: 50%; padding: 0; font: italic 700 13px Georgia, 'Times New Roman', serif; }
-.sl-tool.endless { color: #4cff9a; font-size: 17px; line-height: 1; padding: 0 6px; }
-.sl-tool.endless:hover { background: #11221a; color: #8affbe; }
+/* :is(#menu, .sheet) beats the menu's `button { color: inherit }` */
+:is(#menu, .sheet) .sl-tool.endless {
+  color: #6dffab; padding: 0 10px; border-color: rgba(76, 255, 154, 0.35);
+  background: linear-gradient(180deg, rgba(76, 255, 154, 0.14), rgba(76, 255, 154, 0.06));
+}
+:is(#menu, .sheet) .sl-tool.endless:hover { color: #a6ffcc; border-color: rgba(76, 255, 154, 0.6); background: linear-gradient(180deg, rgba(76, 255, 154, 0.22), rgba(76, 255, 154, 0.1)); }
 
 /* a boss's single attacks: compact cards, no thumbnail */
 .sl-card.mini .sl-body { padding: 8px 10px 0; }

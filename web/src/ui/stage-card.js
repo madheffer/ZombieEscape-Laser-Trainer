@@ -1,7 +1,7 @@
 // A stage card and a grid of them: pure renderers (no game state read here), shared by the stage list
 // (ui/stage-list.js) and the room screen's picker. A card: a 16:9 thumbnail (the stage's own spawn view,
 // maps/<map>/stages/<id>.webp, web/src/dev/capture-stage-shots.js), the name, the scenario's one-line `summary`, one badge
-// (Full run / Boss / Endless) and a personal best. The long technical `description` is only in the details panel:
+// (Full run / Boss), an Endless button when it has one, and a personal best. The long technical `description` is only in the details panel:
 // the (i) button, a right click, or a long press on touch. Scenario text goes in through textContent, never innerHTML.
 // Styles: ui/stage-list.css, class-scoped (.sl-*), so a card looks the same in #menu and in a .sheet.
 import { formatTime, plural } from '../lib/format.js';
@@ -19,12 +19,11 @@ export function el(tag, cls, attrs = {}, text) {
 
 export const FREE_ROAM = { name: 'Free roam', summary: 'Walk the map with its logic idle', description: 'Walk the map with its logic idle. Spawns at the first CT spawn.' };
 
-// the one badge a card carries: what kind of stage it is
+// the one badge a card carries: what kind of stage it is (endless has its own Endless button instead)
 export function badgeOf(s, index = 0) {
   if (index < 0) return null;
   if (s.full) return { cls: 'full', text: 'Full run' };
   if (s.bosses?.length) return { cls: 'boss', text: 'Boss' };
-  if (s.endless) return { cls: 'endless', text: 'Endless' };
   return null;
 }
 
@@ -92,7 +91,7 @@ export function stageCard(scenario, opts = {}) {
     foot.append(d);
   }
   if (s.endless) {
-    const e = el('button', 'sl-tool endless', { type: 'button', title: 'Endless: keeps going until you die', 'aria-label': `${s.name}: endless` }, '∞');
+    const e = el('button', 'sl-tool endless', { type: 'button', title: 'Endless: keeps going until you die', 'aria-label': `${s.name}: endless` }, 'Endless');
     e.addEventListener('click', () => onPick(index, 'endless'));
     foot.append(e);
   }

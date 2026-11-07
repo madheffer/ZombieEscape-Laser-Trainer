@@ -1,5 +1,5 @@
 // The room screen's map + stage picker (ui/room.js): the maps as a compact grid of screenshot cards, then the picked map's
-// stages as the stage list's own cards (ui/stage-list.js: thumbnail, one-line summary, badge, ∞ for endless), grouped
+// stages as the stage list's own cards (ui/stage-list.js: thumbnail, one-line summary, badge, Endless button), grouped
 // the same way (lib/stage-groups.js; a boss's single attacks in a drawer under it), free roam last. The room owner
 // picks; everyone else sees the same cards read-only with the owner's pick marked.
 // Map and scenario text goes in through textContent only.
@@ -79,7 +79,7 @@ export class RoomPicker {
     list.forEach((s, i) => { if (s?.parent && isListed(s)) { if (!byParent.has(s.parent)) byParent.set(s.parent, []); byParent.get(s.parent).push(i); } });
     const parts = groupStages(list);
     parts.push({ name: 'Explore', items: [-1] });
-    // the owner picks (a card plays it, its ∞ plays it endless); everyone else only looks, so no details to play from
+    // the owner picks (a card plays it, its Endless button plays it endless); everyone else only looks, so no details to play from
     const onPick = (i, mode) => { if (this.editable) this.onPick(map, i >= 0 ? list[i].id : null, mode); };
     const onDetails = this.editable ? undefined : () => {};
     const card = (i, extra = {}) => {
