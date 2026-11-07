@@ -4,6 +4,7 @@
 // client says 'ready' and the server starts everyone's clock together once all are (server/coop-round.js), so a
 // slow device never meets the lasers on a black screen.
 import { G, S } from './state.js';
+import { templateEffects } from '../world/warm.js';
 
 const FRAME_TIMEOUT_MS = 500; // a hidden tab gets no animation frames: don't wait for one forever
 const LIMIT_MS = 120_000; // something that never settles must not hold a solo stage for ever (a round has its own)
@@ -42,6 +43,12 @@ export async function prepareStage(run, onStep = () => {}) {
     // the entities' visuals are created by the frame loop (render.updateEntities): let it run, then wait for them
     await nextFrame();
     if (stillRun() && r.loading?.size) { onStep('loading models and effects'); await within(drain(r.loading), until); }
+    // the effects the stage's templates spawn later (its lasers, ze_luciddreams_b5's balls), fetched with the stage so
+    // their first spawn draws at once (world/warm.js templateEffects; fx/effects.js prefetch)
+    if (stillRun() && S.map?.effects && S.engine) {
+      onStep('loading models and effects');
+      await within(S.map.effects.prefetch(templateEffects(S.engine, S.scenario, r.viewBox)), until);
+    }
     if (stillRun() && S.map?.effects) { onStep('loading effect textures'); await within(S.map.effects.texturesLoaded(), until); }
     // the map's sound table (audio.js): no sound of the stage is asked for before it is in
     if (stillRun() && G.audio?.ready) { onStep('loading sounds'); await within(G.audio.ready(), until); }

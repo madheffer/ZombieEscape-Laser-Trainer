@@ -6,7 +6,8 @@
 // lighting's probe materials (per material and volume), three's program cache, the uploaded textures, render.js
 // hullGeometries.
 //
-// Particle effects are not warmed: their spawn is already asynchronous (the systems are fetched first, so a new
+// Particle effect instances are not warmed here (app/readiness.js fetches the effects and their textures with the stage,
+// templateEffects): their spawn is already asynchronous (the systems are fetched first, so a new
 // effect shows a few frames late rather than holding a frame), and warm instances kept alive for their programs
 // brought ~1 s stalls on every later spawn of mist's 3.5 s laser cycle (2026-11-06, cause not found).
 //
@@ -113,6 +114,25 @@ export function templateAssets(engine, scenario = null, view = null, hidden = []
     }
   }
   return out;
+}
+
+// The particle effects the templates this stage can spawn carry (their info_particle_systems' effect_name), for
+// app/readiness.js to fetch with the stage: a template that spawns often and lives briefly (ze_luciddreams_b5's
+// balls: 1.4 s each, 4 every 0.11 s) would otherwise fall its first wave before its effect had loaded
+export function templateEffects(engine, scenario = null, view = null) {
+  const spawnable = stageTemplates(engine, scenario, view);
+  const lumps = new Set();
+  for (const d of spawnable) {
+    if (String(d.kv.classname).toLowerCase() !== 'point_template' || !d.kv.entitylumpname) continue;
+    const k = engine.lumpKeys.get(String(d.kv.entitylumpname).toLowerCase());
+    if (k) lumps.add(k);
+  }
+  const out = new Set();
+  for (const lump of lumps) for (const d of engine.lumps[lump] || []) {
+    const kv = d.kv;
+    if (isParticleSystem(String(kv.classname || '').toLowerCase()) && kv.effect_name) out.add(String(kv.effect_name));
+  }
+  return [...out];
 }
 
 // Warm `run`'s map in the background. renderer: world/render.js; isCurrent() false once the run is over.

@@ -9,7 +9,7 @@
       "group": "Ending",
       "name": "Falling balls",
       "summary": "Look up: dodge the balls falling on you",
-      "description": "minigames_balls (the elevator room, enabled by st1_d_2's break; practice / black mode send you straight here) runs the minigame from your first touch. At +15 s timer_balls starts: every 0.11 s the four maker_balls (parented to door_balls_rot1-4, which swing 470 u/s back and forth on balls_rot_final, 3800 units up) drop a temp_balls ball, a func_movelinear going down 4300 units at 3100 u/s with a 96-unit hurt_balls (99999) on it. From +20 s timer_final_balls reverses the spinner every 0.6-1 s and from +22 s timer_final_balls3 sets the balls' speed (2200-2800, the last output: 2500) and spins it backward. The timers die at +57 s; at +59 s LV1_TOGGLE_WALL breaks and LV1_END_BRIDGE appears, and at +60 s LV1_balls_elevator lifts you (200 u/s) to the boss corridor: the win. Falling off the elevator is the 99999 hurt below.",
+      "description": "minigames_balls (the elevator room, enabled by st1_d_2's break; practice / black mode send you straight here) runs the minigame from your first touch (OnStartTouch, replayed here as the stage's start inputs; the stage starts 10 s in, 5 s before the balls). At +15 s timer_balls starts: every 0.11 s the four maker_balls (parented to door_balls_rot1-4, which swing 470 u/s back and forth on balls_rot_final, 3800 units up) drop a temp_balls ball, a func_movelinear going down 4300 units at 3100 u/s with a 96-unit hurt_balls (99999) on it. From +20 s timer_final_balls reverses the spinner every 0.6-1 s and from +22 s timer_final_balls3 sets the balls' speed (2200-2800, the last output: 2500) and spins it backward. The timers die at +57 s; at +59 s LV1_TOGGLE_WALL breaks and LV1_END_BRIDGE appears, and at +60 s LV1_balls_elevator lifts you (200 u/s) to the boss corridor: the win. Falling off the elevator is the 99999 hurt below.",
       "spawn": {
         "origin": [
           -13000,
@@ -30,10 +30,97 @@
           15600
         ]
       },
+      "fastForward": 10,
       "start": [
         {
-          "target": "minigames_balls",
-          "input": "Enable"
+          "target": "LV1_TP_11",
+          "input": "Enable",
+          "delay": 12
+        },
+        {
+          "target": "clouds",
+          "input": "TurnOn",
+          "delay": 11
+        },
+        {
+          "target": "crystall_boss_particle",
+          "input": "Start",
+          "delay": 13
+        },
+        {
+          "target": "timer_balls",
+          "input": "Enable",
+          "delay": 15
+        },
+        {
+          "target": "timer_final_balls",
+          "input": "Enable",
+          "delay": 20
+        },
+        {
+          "target": "timer_final_balls3",
+          "input": "Enable",
+          "delay": 22
+        },
+        {
+          "target": "timer_balls",
+          "input": "KillHierarchy",
+          "delay": 57
+        },
+        {
+          "target": "clouds",
+          "input": "KillHierarchy",
+          "delay": 57
+        },
+        {
+          "target": "crystall_boss_particle",
+          "input": "KillHierarchy",
+          "delay": 57
+        },
+        {
+          "target": "crystall_boss_particle_dead",
+          "input": "Start",
+          "delay": 58
+        },
+        {
+          "target": "door_balls_rot*",
+          "input": "KillHierarchy",
+          "delay": 58
+        },
+        {
+          "target": "LV1_TOGGLE_WALL",
+          "input": "KillHierarchy",
+          "delay": 59
+        },
+        {
+          "target": "LV1_END_BRIDGE",
+          "input": "Toggle",
+          "delay": 59
+        },
+        {
+          "target": "crystall_boss_particle_dead",
+          "input": "KillHierarchy",
+          "delay": 59
+        },
+        {
+          "target": "LV1_balls_elevator",
+          "input": "Open",
+          "delay": 60
+        },
+        {
+          "target": "timer_final_balls",
+          "input": "KillHierarchy",
+          "delay": 60
+        },
+        {
+          "target": "timer_final_balls3",
+          "input": "KillHierarchy",
+          "delay": 60
+        },
+        {
+          "target": "balls_rot_final",
+          "input": "Kill",
+          "delay": 61
         }
       ],
       "music": [

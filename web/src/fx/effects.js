@@ -214,6 +214,27 @@ export class MapEffects {
 
   // every effect texture asked for so far, loaded (or failed): app/readiness.js
   texturesLoaded() { return Promise.all([...this.texCache.values()].map((b) => b.loaded)); }
+  // Fetch effects before anything spawns them: their systems (and children) and every texture they name, so the
+  // first spawn draws at once. No instance is made (warm instances kept alive cost stalls: world/warm.js). Resolves
+  // once the systems are in; texturesLoaded() then waits for the textures (app/readiness.js)
+  async prefetch(effects) {
+    const tex = this.assets();
+    const textures = new Set();
+    const walk = (v) => {
+      if (!v || typeof v !== 'object') return;
+      if (Array.isArray(v)) { for (const x of v) walk(x); return; }
+      for (const [k, x] of Object.entries(v)) {
+        if (typeof x === 'string' && /^m_hTexture/.test(k) && x) textures.add(x);
+        else walk(x);
+      }
+    };
+    await Promise.all(effects.filter((e) => this.has(e)).map(async (e) => {
+      const doc = await this.doc(e).catch(() => null);
+      for (const s of doc?.systems || []) walk(s.data?.m_Renderers);
+    }));
+    for (const t of textures) tex.texture(t, false);
+  }
+
 
   report(m) { if (!this.reports.has(m)) { this.reports.add(m); this.onReport?.(m); } }
 
