@@ -362,7 +362,10 @@ function cleanEnd(d) {
     r: d.r, result: ['win', 'lose', 'draw', 'over'].includes(d.result) ? d.result : 'lose', reason: cleanText(d.reason, 10),
     at: num(d.at, 0, 1e6) ? d.at : 0, winners: d.winners.filter(Number.isInteger).slice(0, 8),
     best: Array.isArray(d.best) ? d.best.filter(Number.isInteger).slice(0, 8) : [],
-    stats: d.stats.slice(0, 8).filter((s) => Number.isInteger(s?.id)).map((s) => ({ id: s.id, alive: !!s.alive, at: num(s.at, 0, 1e6) ? s.at : null, hits: num(s.hits, 0, 1e6) ? s.hits : 0 })),
+    stats: d.stats.slice(0, 8).filter((s) => Number.isInteger(s?.id)).map((s) => ({
+      id: s.id, alive: !!s.alive, at: num(s.at, 0, 1e6) ? s.at : null, hits: num(s.hits, 0, 1e6) ? s.hits : 0,
+      dl: num(s.dl, 0, 1e6) ? s.dl | 0 : 0, db: num(s.db, 0, 1e6) ? s.db | 0 : 0, cheat: !!s.cheat, // lasers / balls dodged; removed by the anti-cheat
+    })),
   };
 }
 

@@ -15,6 +15,7 @@ import { settings } from './settings.js';
 import { rule, godMode, stripperChoice } from './rules.js';
 import { mapEdits } from '../world/assets.js';
 import { submitRun, getRecord } from './records.js';
+import { fetchRecordToBeat, timesStrip, boardPlace, placeBlock } from './record-to-beat.js';
 import { reportSolo } from './activity.js';
 import { ReplayRecorder, keepLastRun, lastRun } from './replay-record.js';
 import { account, SIGN_IN_URL } from './account.js';
@@ -72,6 +73,8 @@ export function startScenario(i, mode = 'normal') {
     // the end-of-run report (app/console/run-report.js): what came at you and what you got past, your shots and jumps
     dodges: new DodgeTracker(hazardName), shots: 0, jumps: 0,
   };
+  // the end card's record to beat, fetched now so it is there when the run ends (app/record-to-beat.js)
+  if (!S.replay) fetchRecordToBeat(run, { map: S.map?.name, stage: scenario?.id, mode: run.mode, kind: S.mp ? 'coop' : 'solo' });
 
   player.gravityScale = scenario?.player?.gravity ?? 1;
   player.speedScale = 1;
@@ -290,25 +293,39 @@ export function finish(result) {
   keepLastRun(replay, info);
   reportSolo({ map, stage, mode: run.mode, result, time: t, hits: run.hits, cause: result === 'dead' ? hazardName(run.killedBy) : '', name: G.lobby?.name || '', god: godMode() }, replay)
     .then((r) => { if (r?.replay && lastRun()?.info === info) info.id = String(r.replay); }); // its link (Copy link)
-  const best = getRecord(map, stage, run.mode);
+  const best = rec ? rec.previous : getRecord(map, stage, run.mode); // your best before this run
   const retry ={ label: 'Retry', key: 'Enter', primary: result !== 'win', onClick: () => G.play(S.scenarioIndex, run.mode) };
   const menu = { label: 'Menu', key: 'Escape', onClick: () => { G.overlay.hide(); G.menu.update(); } };
   const watch = replay ? [{ label: 'Watch replay', onClick: () => G.watchLastRun() }] : []; // no key: W is a movement key (held at death it would start the replay)
   // a guest's run isn't kept on the server: Steam's sign-in page and back, then it is sent (app/activity.js)
   const save = !account.user && scenario && !godMode()
     ? [{ label: 'Sign in with Steam to save', primary: result === 'win' && !scenario.endless, onClick: () => { location.href = SIGN_IN_URL; } }] : []; // no key: S is a movement key
+  // this run / your best / the record (a death mid-stage has no clear time to set against them), then the chips
+  const strip = timesStrip({
+    label: run.endless ? 'Survived' : result === 'win' ? 'Your time' : 'Survived', time: t, best: best?.time ?? null,
+    board: run.board, endless: run.endless, counts: result === 'win' || run.endless,
+  });
+  const times = strip.times;
+  const place = placeBlock(boardPlace(run.board, t, { endless: run.endless, counts: result === 'win' || run.endless }));
+  const badges = strip.record ? [{ text: run.endless ? 'Longest on the board' : 'New record', tone: 'gold' }]
+    : strip.pb ? [{ text: run.endless ? 'New personal best' : 'New best time', tone: 'good' }]
+      : !best && result === 'win' && !run.endless ? [{ text: 'First clear', tone: 'good' }]
+      : rec?.improved.hits ? [{ text: 'Fewest hits yet', tone: 'good' }] : [];
+  const d = run.dodges.dodged;
   const stats = [
-    [run.endless ? 'Survived' : result === 'win' ? 'Time' : 'Survived', formatTime(t), !!rec?.improved.time],
     ['Hits taken', String(run.hits), !!rec?.improved.hits],
+    ['Lasers dodged', String(d.laser)],
+    ['Balls dodged', String(d.ball)],
   ];
   if (run.myHits) stats.push(['Your boss hits', String(run.myHits)]);
-  if (best && !rec?.improved.time) stats.push([run.endless ? 'Best survived' : 'Best time', formatTime(best.time)]);
+  // a guest's record isn't on the board until they sign in (the Sign in button)
+  const note = place && !account.user ? 'Sign in with Steam to put this run on the leaderboard' : '';
 
   if (run.endless) {
     G.overlay.show({
       kind: 'endless', kicker: `${scenario.name} · endless`, title: 'RUN OVER',
       subtitle: result === 'dead' ? `Killed by ${hazardName(run.killedBy)}` : result === 'quit' ? 'You ended the run' : 'Stage failed',
-      record: rec?.improved.time ? 'New personal best' : '', stats, buttons: [retry, ...save, ...watch, menu],
+      badges, times, place, stats, note, buttons: [retry, ...save, ...watch, menu],
     }); G.menu.update();
     return;
   }
@@ -319,14 +336,14 @@ export function finish(result) {
     G.overlay.show({
       kind: 'win', kicker: scenario?.name || '', title: 'STAGE CLEARED',
       subtitle: run.hits ? `${plural(run.hits, 'hit')} taken` : 'Clean run, no hits',
-      record: rec?.improved.time ? 'New best time' : rec?.improved.hits ? 'Fewest hits yet' : '', stats, buttons,
+      badges, times, place, stats, note, buttons,
     }); G.menu.update();
     return;
   }
   G.overlay.show({
     kind: 'dead', kicker: scenario?.name || 'Free roam', title: result === 'dead' ? 'YOU DIED' : 'STAGE FAILED',
     subtitle: result === 'dead' ? `Killed by ${hazardName(run.killedBy)}${run.lastHurt ? ` (${Math.round(run.lastHurt.dmg)})` : ''}` : 'The boss got away',
-    stats, buttons: [retry, ...save, ...watch, menu],
+    times, stats, buttons: [retry, ...save, ...watch, menu],
   });
   G.menu.update();
 }
