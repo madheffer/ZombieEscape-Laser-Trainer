@@ -2,7 +2,10 @@
 //  - static props (the "sprp" game lump, v4-v11): placed into the world glb (they never move), each vertex lit by
 //    the ambient cube at the prop's lighting origin with the visible world lights folded in (AmbientLight.LitCube), as
 //    Source lights a prop without baked vertex light
-//    (the map ships no .vhv). STATIC_PROP_NO_DRAW props are left out.
+//    (the map ships no .vhv). Every prop is drawn: the lump's 0x4 bit (STATIC_PROP_NO_DRAW, "computed at run time") is
+//    copied by CS:GO's CStaticProp::Init (engine.dll 0x1028ebf7: flags & 0x64) but nothing in its static prop code tests
+//    it; CS:GO hides a prop by its min / max CPU / GPU level bytes instead (0 = every level; ze_luciddreams_b5's ~40
+//    grass props with 0x3f / 0xbf flags were missing here).
 //  - entity models (prop_dynamic, prop_physics, ...): models/<path>.glb in model space, lit at runtime by the
 //    ambient cube where the entity stands (material extras.lightmap "cube", world/source1-light.js).
 // A model is read once per (path, skin).
@@ -12,7 +15,7 @@ namespace Lasers.Bake.Source1;
 
 static class PropBake
 {
-    const int StaticPropUseLightingOrigin = 0x2, StaticPropNoDraw = 0x4;
+    const int StaticPropUseLightingOrigin = 0x2;
 
     public sealed record StaticProp(string Model, Vector3 Origin, Vector3 Angles, int Solid, int Flags, int Skin, Vector3 LightingOrigin, float Scale);
 
@@ -70,7 +73,6 @@ static class PropBake
         var missing = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var sp in props)
         {
-            if ((sp.Flags & StaticPropNoDraw) != 0) continue;
             var model = cache.Get(sp.Model, sp.Skin);
             if (model == null) { missing.Add(sp.Model); continue; }
             var r = Entities.AngleMatrix([sp.Angles.X, sp.Angles.Y, sp.Angles.Z]);
@@ -84,7 +86,7 @@ static class PropBake
                 if (!matIndex.TryGetValue(key, out var mi))
                 {
                     mi = world.Materials.Count;
-                    world.Materials.Add(new Glb.Material(info.Name, info.Texture, info.AlphaMode, info.Cutoff, info.DoubleSided, info.Color, "vertex", info.Additive));
+                    world.Materials.Add(new Glb.Material(info.Name, info.Texture, info.AlphaMode, info.Cutoff, info.DoubleSided, info.Color, "vertex", info.Additive, BlendCutoff: info.BlendCutoff));
                     matIndex[key] = mi;
                     used.Add(info);
                 }
@@ -188,7 +190,7 @@ static class PropBake
                 if (!matIndex.TryGetValue(info.Name, out var mi))
                 {
                     mi = glb.Materials.Count;
-                    glb.Materials.Add(new Glb.Material(info.Name, info.Texture, info.AlphaMode, info.Cutoff, info.DoubleSided, info.Color, "cube", info.Additive));
+                    glb.Materials.Add(new Glb.Material(info.Name, info.Texture, info.AlphaMode, info.Cutoff, info.DoubleSided, info.Color, "cube", info.Additive, BlendCutoff: info.BlendCutoff));
                     matIndex[info.Name] = mi;
                     used.Add(info);
                 }

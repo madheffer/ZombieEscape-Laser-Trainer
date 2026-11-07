@@ -30,7 +30,8 @@ function convert(src) {
   const range = /^rgbm(\d+(\.\d+)?)$/.exec(kind)?.[1];
   const m = new THREE.MeshBasicMaterial({
     name: src.name, map: src.map, color: src.color, transparent: src.transparent, opacity: src.opacity,
-    alphaTest: src.alphaTest, side: src.side, depthWrite: src.depthWrite, aoMap: range ? src.aoMap : null,
+    // extras.alphaTest: a $translucent + $alphatest material, blended and alpha-tested as Source draws it
+    alphaTest: Number(src.userData?.alphaTest) > 0 ? Math.min(1, Number(src.userData.alphaTest)) : src.alphaTest, side: src.side, depthWrite: src.depthWrite, aoMap: range ? src.aoMap : null,
     vertexColors: kind === 'vertex', // a static prop: its ambient-cube light baked into COLOR_0
   });
   m.userData = { ...src.userData };

@@ -3,8 +3,7 @@
 // entities/classes/skybox-swapper.js) and the color_correction lookups blended into the post pass's colour lookup
 // (manifest correction: correction.json + the .raw files, entities/classes/color-correction.js).
 // Source's material system blends the active lookups by weight: a weight sum over 1 is scaled back to 1, and what is
-// left under 1 goes to the identity (UNSETTLED: from the SDK's colorcorrection mgr behaviour as remembered, not
-// decompiled from CS:GO's materialsystem.dll). The lookup is applied to the frame's gamma-space colour, after the tone
+// left under 1 goes to the identity (CS:GO materialsystem.dll FUN_10008f60, at most 4 lookups). The lookup is applied to the frame's gamma-space colour, after the tone
 // map: the same place world/tonemap.js applies CS2's (cs2ColorCorrect), whose uniforms this drives for a Source 1 map
 // (which has no post_processing_volume of its own). And its HDR auto-exposure (exposure-source1.js), within the
 // limits its env_tonemap_controller sets.
@@ -68,11 +67,14 @@ export class Source1Look {
   }
 
   // engine: the run's entity engine (null between runs: the map's own sky, no lookup); eye: the view position
-  update(renderer, engine, eye) {
+  // shown: the stage is on screen (false while it loads: a black frame would drive the exposure up)
+  update(renderer, engine, eye, shown = true) {
     this.updateSky(renderer, engine);
     this.updateCorrection(renderer.post, engine, eye);
-    if (engine !== this.exposureEngine) { this.exposureEngine = engine; this.exposure.reset(); } // a new run measures afresh
-    this.exposure.update(renderer, engine);
+    // a new run, or its first frame on screen, starts the exposure at 1 again
+    const key = shown ? engine : null;
+    if (key !== this.exposureEngine) { this.exposureEngine = key; this.exposure.reset(); }
+    if (shown) this.exposure.update(renderer, engine);
     (this.smoke ||= new SmokeTrails(this.data.sprites, renderer.scene)).update(engine, renderer.camera);
   }
 
@@ -96,12 +98,13 @@ export class Source1Look {
     if (key === this.ccKey) { if (list.length) { u.cs2Lut.value = this.tex; u.cs2LutDim.value = this.dim; u.cs2LutWeight.value = 1; } return; }
     this.ccKey = key;
     if (!list.length) { u.cs2LutWeight.value = 0; return; }
+    // CS:GO materialsystem.dll FUN_10008f60 (CColorCorrectionSystem's normalised weights): the first 4 active
+    // lookups; a sum <= 0.999 leaves 1 - sum to the identity, else the identity gets 0 and each weight is x 1 / sum
+    // (ze_luciddreams_b5's corridor: Color3 + color4 reach 1.8, each then counts 1 / 1.8)
+    list.length = Math.min(list.length, 4);
     const total = list.reduce((s, c) => s + c.weight, 0);
-    // unnormalised: the identity takes 1 - sum, negative past 1 (ROADMAP: matches the footage of ze_xenovation's
-    // relay13 green, though the header says otherwise). ze_luciddreams_b5's corridor reaches 1.8 (Color3 blackwhite, an
-    // inverting lookup, + color4 whiteBB): it draws inverted this way; not checked against footage of it
-    const scale = 1;
-    const ident = 1 - total;
+    const scale = total <= 0.999 ? 1 : 1 / total;
+    const ident = total <= 0.999 ? 1 - total : 0;
     const d = this.dim, mix = this.mix, out = this.tex.image.data;
     // the identity's share: the lookup's own coordinates (red fastest, then green, then blue)
     for (let b = 0, i = 0; b < d; b++) for (let g = 0; g < d; g++) for (let r = 0; r < d; r++, i += 3) {

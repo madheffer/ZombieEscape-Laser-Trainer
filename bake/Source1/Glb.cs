@@ -14,7 +14,7 @@ namespace Lasers.Bake.Source1;
 
 sealed class Glb
 {
-    public sealed record Material(string Name, string? Image, string AlphaMode, float Cutoff, bool DoubleSided, Vector4 Color, string? Lightmap = null, bool Additive = false, Materials.RefractInfo? Refract = null);
+    public sealed record Material(string Name, string? Image, string AlphaMode, float Cutoff, bool DoubleSided, Vector4 Color, string? Lightmap = null, bool Additive = false, Materials.RefractInfo? Refract = null, float? BlendCutoff = null);
 
     public sealed class Prim
     {
@@ -187,6 +187,8 @@ sealed class Glb
             }
             if (m.AlphaMode != "OPAQUE") mat["alphaMode"] = m.AlphaMode;
             if (m.AlphaMode == "MASK") mat["alphaCutoff"] = m.Cutoff;
+            // $translucent + $alphatest: blended AND alpha-tested (glTF has no such mode; the renderer reads this)
+            if (m.BlendCutoff is { } bc) ((JsonObject)(mat["extras"] ??= new JsonObject()))["alphaTest"] = bc;
             mats.Add(mat);
         }
 

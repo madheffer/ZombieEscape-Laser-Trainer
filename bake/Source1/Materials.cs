@@ -9,7 +9,7 @@ namespace Lasers.Bake.Source1;
 
 sealed class Materials(GameFiles files, Action<string> log)
 {
-    public sealed record Info(string Name, string? Texture, string AlphaMode, float Cutoff, bool DoubleSided, Vector4 Color, int Width, int Height, bool Tool, bool Additive, bool Unlit = false, RefractInfo? Refract = null);
+    public sealed record Info(string Name, string? Texture, string AlphaMode, float Cutoff, bool DoubleSided, Vector4 Color, int Width, int Height, bool Tool, bool Additive, bool Unlit = false, RefractInfo? Refract = null, float? BlendCutoff = null);
 
     // A Refract material (Source's refract shader: the scene behind it warped by a normal map): its $normalmap's PNG,
     // $refractamount, $bluramount, $refracttint and its TextureScroll proxy on $bumptransform (rate in texture units a
@@ -52,7 +52,9 @@ sealed class Materials(GameFiles files, Action<string> log)
         if (refract != null) { translucent = true; w = h = 0; } // its UVs: the BSP's texdata size (the %tooltexture's)
         var info = new Info(key, file, translucent || alpha < 1 ? "BLEND" : alphaTest ? "MASK" : "OPAQUE",
             vmt?.Num("$alphatestreference", 0.5f) ?? 0.5f, vmt?.Flag("$nocull") == true || translucent,
-            new Vector4(color, alpha), w, h, key.StartsWith("tools/") && key != "tools/toolsblack", additive, shader == "unlitgeneric" || refract != null, refract);
+            new Vector4(color, alpha), w, h, key.StartsWith("tools/") && key != "tools/toolsblack", additive, shader == "unlitgeneric" || refract != null, refract,
+            // $translucent with $alphatest: Source enables both the blend and the alpha test (aztec_grass_field, ref .5)
+            translucent && alphaTest && !additive ? vmt?.Num("$alphatestreference", 0.5f) ?? 0.5f : null);
         cache[key] = info;
         return info;
     }

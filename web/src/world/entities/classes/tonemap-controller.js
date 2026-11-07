@@ -10,8 +10,8 @@
 //   Source SDK 2013 (env_tonemap_controller.cpp, player.cpp): a Set input turns its custom value on until the
 //     matching UseDefault input; the player's controller is the first env_tonemap_controller in the map (a
 //     trigger_tonemap can hand it another, not handled: no map of ours has one).
-// UNSETTLED: the defaults of the tonemap fields when a map never sets them (CS:GO's constructor not decompiled): the
-//   SDK 2013 cvar defaults are used (world/exposure-source1.js TONEMAP_DEFAULTS).
+// The fields a map never sets keep CS:GO's constructor values (server.dll FUN_1026dbd0: rate 1, percent target 65,
+//   bright pixels 2, min avg lum 3: world/exposure-source1.js TONEMAP_DEFAULTS).
 // ze_luciddreams_b5: logic_auto OnMapSpawn -> tone.SetAutoExposureMax(1.1), SetAutoExposureMin(0.75), SetBloomScale(2.5).
 import { register } from '../registry.js';
 import { num } from '../math.js';

@@ -29,7 +29,7 @@ static class FaceMesh
             if (!matIndex.TryGetValue(info.Name, out var mi))
             {
                 mi = glb.Materials.Count;
-                glb.Materials.Add(new Glb.Material(info.Name, info.Texture, info.AlphaMode, info.Cutoff, info.DoubleSided, info.Color, lightmapFile, info.Additive, info.Refract));
+                glb.Materials.Add(new Glb.Material(info.Name, info.Texture, info.AlphaMode, info.Cutoff, info.DoubleSided, info.Color, lightmapFile, info.Additive, info.Refract, info.BlendCutoff));
                 matIndex[info.Name] = mi;
                 used.Add(info);
             }
