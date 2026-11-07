@@ -223,6 +223,12 @@ Sounds, effects and sprites (bake/Source1/Source1Sounds.cs, Source1Particles.cs 
 - `"_s1sky"` on each entity in the sky_camera's BSP area (SkyArea.cs): the player draws it as the 3D skybox.
 Files come from the map's pakfile, then CS:GO's `csgo/pak01_dir.vpk`, then `platform/platform_pak01_dir.vpk` (the
 engine's last search path: `hlmv/gray`). UnlitGeneric faces take no lightmap (white001_nochop lasers in an unlit room).
+A map packed with `bspzip -compress` (every lump, game lump and pakfile entry LZMA: ze_lifeforms_v1_1) is unpacked as it is read
+(Source1/Lzma.cs, LzmaSpec's decoder; Source1/PakZip.cs reads the pakfile's stored / deflate / LZMA entries). A CS:S map (VBSP 19 / 20) looks in
+CS:S's `cstrike_pak_dir.vpk` and hl2's texture / misc VPKs first when CS:S is installed (`LASERS_CSS=<...>/cstrike`); without it, a CS:S stock file
+CS:GO lacks comes from the logged stand-ins in GameFiles.cs (`cs_italy/white` -> CS:GO's solid white cs_havana/white), a stock particle
+variant (`particle_glow_05_addnofog`) is rebuilt over the base texture CS:GO keeps (Source1/StockVariants.cs), and a particle renderer whose
+material or texture nothing has is left out (logged "not drawn") rather than drawing the error checker the map's players never see.
 
 For a map already baked, redo only those: `lasers-bake <map.bsp> web/public/maps --only sounds,fx,sprites,correction`
 (bumps the manifest version, keeps everything else). Not baked yet: lighting/, tiers.
@@ -253,6 +259,8 @@ source is `ze_nora_v1_11.rar` (the .bsp inside; not on the workshop). Then the m
 is a 640x240 crop of a screenshot of the tree path, not a capture.
 
 ## Single steps
+ze_lifeforms_v1_1: `--box 0 -17500 -15300 17500 7000 5500` (stage 4's arena, shaft, corridor and last lift: 3.2M -> 260k triangles). Its source is
+`ze_lifeforms_v1_1.bsp.bz2` (CS:S). Its card is vauff.com's map image (mapimgs/240/ze_lifeforms.jpg), rows 300-1020 scaled to 640x240.
 
 For a map that's already baked, each piece can be redone on its own (`lasers-bake <mode> <workshop.vpk> <map dir>`):
 

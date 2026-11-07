@@ -132,6 +132,9 @@ static class Source1Particles
                      ("forces", "m_ForceGenerators"), ("constraints", "m_Constraints"), ("renderers", "m_Renderers") })
         {
             var arr = new JsonArray();
+            // a renderer of content the bake doesn't have (GameFiles.ForeignStock) draws nothing rather than an error
+            // checker the map's own game never shows
+            if (src == "renderers" && material(mat).Unavailable) continue;
             foreach (var op in def.Elements(src))
                 if (PcfOps.Convert(op, material, mat, skipped) is { } fn) arr.Add(fn);
             if (arr.Count > 0) o[dst] = arr;
@@ -161,9 +164,14 @@ static class Source1Particles
         var vmt = Vmt.Load(files, key);
         // a material or texture the game can't find draws as Source's error material: the texture is named anyway, and
         // the runtime draws its error texture (a magenta / black checker, as Source's) for a key the index lacks
-        if (vmt == null) { log($"  fx: material {key} missing"); return new($"materials/{Clean(key)}.vtf", 0, false, 1, 0, null, null, null, null, null); }
+        if (vmt == null)
+        {
+            log($"  fx: material {key} missing{(files.ForeignStock ? ": not drawn (the game's own content, not installed)" : "")}");
+            return new($"materials/{Clean(key)}.vtf", 0, false, 1, 0, null, null, null, null, null, files.ForeignStock);
+        }
         double? Opt(string k) => vmt.Get(k) is { } v && double.TryParse(v.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? d : null;
         string? texKey = null;
+        var texMissing = false;
         var height = 0;
         if (vmt.Get("$basetexture")?.Replace('\\', '/').Trim() is { Length: > 0 } tex)
         {
@@ -188,10 +196,10 @@ static class Source1Particles
                     height = img.Height;
                 }
             }
-            else log($"  fx: texture materials/{t}.vtf missing");
+            else { log($"  fx: texture materials/{t}.vtf missing{(files.ForeignStock ? ": not drawn (the game's own content, not installed)" : "")}"); texMissing = true; }
         }
         return new(texKey, height, vmt.Flag("$additive"), Opt("$overbrightfactor") ?? 1, Opt("$addself") ?? 0,
-            Opt("$minsize"), Opt("$maxsize"), Opt("$startfadesize"), Opt("$endfadesize"), vmt.Flag("$depthblend") ? Opt("$depthblendscale") ?? 50 : null);
+            Opt("$minsize"), Opt("$maxsize"), Opt("$startfadesize"), Opt("$endfadesize"), vmt.Flag("$depthblend") ? Opt("$depthblendscale") ?? 50 : null, texMissing && files.ForeignStock);
     }
 
     // the VTF's sprite sheet resource (tag 0x10 0 0) -> [{ id, clamp, totalTime, frames: [{ time, uv }] }] (first image)

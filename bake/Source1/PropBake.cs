@@ -86,7 +86,7 @@ static class PropBake
                 if (!matIndex.TryGetValue(key, out var mi))
                 {
                     mi = world.Materials.Count;
-                    world.Materials.Add(new Glb.Material(info.Name, info.Texture, info.AlphaMode, info.Cutoff, info.DoubleSided, info.Color, "vertex", info.Additive, BlendCutoff: info.BlendCutoff));
+                    world.Materials.Add(new Glb.Material(info.Name, info.Texture, info.AlphaMode, info.Cutoff, info.DoubleSided, info.Color, "vertex", info.Additive, info.Refract, info.BlendCutoff));
                     matIndex[key] = mi;
                     used.Add(info);
                 }
@@ -190,7 +190,7 @@ static class PropBake
                 if (!matIndex.TryGetValue(info.Name, out var mi))
                 {
                     mi = glb.Materials.Count;
-                    glb.Materials.Add(new Glb.Material(info.Name, info.Texture, info.AlphaMode, info.Cutoff, info.DoubleSided, info.Color, "cube", info.Additive, BlendCutoff: info.BlendCutoff));
+                    glb.Materials.Add(new Glb.Material(info.Name, info.Texture, info.AlphaMode, info.Cutoff, info.DoubleSided, info.Color, "cube", info.Additive, info.Refract, info.BlendCutoff));
                     matIndex[info.Name] = mi;
                     used.Add(info);
                 }

@@ -39,9 +39,10 @@ static class PcfOps
 
     const double Deg = Math.PI / 180;
 
-    /// What a renderer needs from the system's material (Source1Particles reads the .vmt and bakes the texture)
+    /// What a renderer needs from the system's material (Source1Particles reads the .vmt and bakes the texture).
+    /// Unavailable: game content we don't have (a CS:S map baked without CS:S): its renderers are left out
     public sealed record Material(string? Texture, int Height, bool Additive, double Overbright, double AddSelf,
-        double? MinSize, double? MaxSize, double? StartFade, double? EndFade, double? DepthBlend);
+        double? MinSize, double? MaxSize, double? StartFade, double? EndFade, double? DepthBlend, bool Unavailable = false);
 
     // a function's attributes with Source 1's defaults
     sealed class A(DmxElement e)

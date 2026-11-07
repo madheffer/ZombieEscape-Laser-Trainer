@@ -250,12 +250,16 @@ export class EntityEngine {
     return created;
   }
 
-  kill(e) {
+  // hierarchy: kill the children too. CS2's Kill does; Source 1's doesn't (SDK 2013 CBaseEntity::InputKill is a
+  // plain UTIL_Remove and the children are unlinked from it, staying where they are; InputKillHierarchy walks the
+  // children first). ze_lifeforms_v1_1 relies on it: phase2_door_move_c is killed with every human still standing on
+  // the platform parented to it.
+  kill(e, hierarchy = !this.source1) {
     if (!e.alive) return;
     e.alive = false;
     for (const c of [...e.children]) {
-      // Source: children of a killed parent are killed too
-      this.kill(c);
+      if (hierarchy) this.kill(c, true);
+      else if (c.alive) c.setParent(null);
     }
     this.live--;
     C[e.cls]?.killed?.(e); // a class's own removal (a train's stop sound)
@@ -419,7 +423,7 @@ export class EntityEngine {
     if (h?.input && h.input(e, inp, param, activator, caller)) return;
     switch (inp) {
       case 'kill': this.kill(e); return;
-      case 'killhierarchy': this.kill(e); return;
+      case 'killhierarchy': this.kill(e, true); return;
       // a prop's Break (westersand's hall pillars); breakables have their own (classes/brushes.js)
       case 'break': this.breakEntity(e, activator); return;
       case 'lock': case 'unlock': e.state.locked = inp === 'lock'; return; // buttons: no player use here

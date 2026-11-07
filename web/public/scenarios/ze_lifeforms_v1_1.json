@@ -1,0 +1,166 @@
+{
+  "map": "ze_lifeforms_v1_1",
+  "title": "Lifeforms",
+  "engine": "css",
+  "hide": ["s4_manta_arena*"],
+  "description": "Madara's CS:S ZE map (baked from its BSP). Stage 4's ending, after the Lifeform boss dies: ride the platform up the shaft through the protozoa and pink beams, slide through the spinning lasers and the blue lasers, then the mini-boss and the last lift.",
+  "scenarios": [
+    {
+      "id": "s4_rising",
+      "group": "Ending",
+      "featured": true,
+      "name": "Rising platform",
+      "summary": "Look up: dodge the protozoa and pink beams",
+      "description": "Stage 4, after the Lifeform dies (s4_boss_end_relay, ff 17 s). template_phase2_dodge (+3 s) spawns the 800-unit platform at the top of the shaft; phase2_lifeform_movelinear (a func_door, 650 u/s) comes 8,570 units down to the arena, waits 6 s and rises back up. From 1.5 s into the rise phase2_timer (every 0.1-0.15 s) picks one of three: a protozoan from one of nine makers in a + (phase2_case_a) or eight in an x (phase2_case_b), or a pink beam (template_h_o_b_beam, 1,008 units long) at one of 20 angles 10 degrees apart. They spawn 950 units above the platform and stay where they spawn for 1.75 s, so the platform carries you up into them: a protozoan is 300 (150 a touch), a beam 250 (125 a touch). Win when the platform is at the top (phase2_door_move_c.Open). Ours, for the zombies a server has: off the platform and down on the arena floor, and they have caught you. Endless: the platform goes back down and up again, the protozoa and beams never stop.",
+      "spawn": {
+        "origin": [9536, -208, -13772],
+        "yaw": 90
+      },
+      "view": {
+        "min": [0, -6000, -15300],
+        "max": [17500, 7000, 5500]
+      },
+      "fastForward": 17,
+      "start": [
+        { "target": "Map_Warmup_relay", "input": "Kill" },
+        { "target": "Relay_Pick_Random_Stage", "input": "Kill" },
+        { "target": "fog", "input": "SetStartDist", "param": "5800", "delay": 0.02 },
+        { "target": "fog", "input": "SetEndDist", "param": "19000", "delay": 0.02 },
+        { "target": "template_stage4", "input": "ForceSpawn" },
+        { "target": "template_boss_lifeform", "input": "ForceSpawn" },
+        { "target": "s4_boss_end_relay", "input": "Trigger", "delay": 0.05 }
+      ],
+      "win": { "target": "phase2_door_move_c", "input": "Open" },
+      "caught": [
+        {
+          "after": 0,
+          "area": {
+            "min": [5500, -2200, -14700],
+            "max": [13600, 1800, -13795]
+          },
+          "name": "the zombies (fell off the platform)",
+          "endless": true
+        }
+      ],
+      "endless": {
+        "cancel": [
+          { "target": "phase2_*", "input": "Kill" },
+          { "target": "phase2_door_move_c", "input": "Open" },
+          { "target": "p2_s4_hurt_humans_fail", "input": "Enable" },
+          { "target": "p2_s4_tp_after_boss", "input": "Enable" }
+        ],
+        "chain": [
+          {
+            "on": { "target": "phase2_lifeform_movelinear", "input": "Close" },
+            "fire": [
+              { "target": "phase2_lifeform_movelinear", "input": "Open", "delay": 14.3 },
+              { "target": "phase2_lifeform_movelinear", "input": "Close", "delay": 28.6 }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "s4_spinning_lasers",
+      "group": "Ending",
+      "featured": true,
+      "name": "Spinning lasers",
+      "summary": "Ride through the spinning and blue lasers",
+      "description": "Stage 4 after the rise (ff 36 s): at the top of the shaft phase2_door_move_c carries the platform 9,400 units along the corridor at 135 u/s (about 70 s). On the way it passes through p2_s4_rotate_brush and p2_s4_rotate_brush2, the two spinning lasers (p2_s4_rotate_hurt / _hurt2: 80, 40 a touch), and at p2_s4_once_blue_lasers three blue lasers come down ahead of it 2.5 s apart, each at one of two spots (p2_s4_blue_laser_case1-3 -> template_u_1_w_laser: 99999), then sweep along the corridor. Falling off is p2_s4_hurt_humans_fail (99999999) under the platform's path. Win when you step off onto the walkway at the end (p2_s4_once_blocks). Ours, for the zombies a server has: still on the platform 15 s after it stops, and they have caught you.",
+      "spawn": {
+        "origin": [9536, -208, -5200],
+        "yaw": 270
+      },
+      "view": {
+        "min": [0, -15000, -9000],
+        "max": [17500, 5000, 5500]
+      },
+      "fastForward": 36,
+      "start": [
+        { "target": "Map_Warmup_relay", "input": "Kill" },
+        { "target": "Relay_Pick_Random_Stage", "input": "Kill" },
+        { "target": "fog", "input": "SetStartDist", "param": "5800", "delay": 0.02 },
+        { "target": "fog", "input": "SetEndDist", "param": "19000", "delay": 0.02 },
+        { "target": "template_stage4", "input": "ForceSpawn" },
+        { "target": "template_boss_lifeform", "input": "ForceSpawn" },
+        { "target": "s4_boss_end_relay", "input": "Trigger", "delay": 0.05 }
+      ],
+      "win": { "target": "p2_s4_break_sc_zm", "input": "Break", "from": "p2_s4_once_blocks", "survive": 1 },
+      "loseTo": [
+        "stage4_zm_moving_plat_corridor"
+      ],
+      "caught": [
+        {
+          "on": { "target": "phase2_door_move_c", "input": "Kill" },
+          "delay": 12,
+          "area": {
+            "min": [5500, -10050, -6200],
+            "max": [13600, 1000, -4500]
+          },
+          "name": "the zombies (still on the platform)"
+        }
+      ]
+    },
+    {
+      "id": "s4_full",
+      "group": "Ending",
+      "full": true,
+      "name": "Full ending",
+      "summary": "Boss down to the last lift: the whole ending",
+      "description": "Stage 4 from the Lifeform's death (s4_boss_end_relay) to the win. The platform comes down to the arena (get on it: GET TO THE MIDDLE PLATFORM), rises through the protozoa and pink beams (22-36 s), then slides along the corridor through the two spinning lasers and the blue lasers (37-107 s). Off the platform, p2_s4_once_blocks starts the walkway; 20 s later template_move_brush_end brings the two sliding blocks (99999 to stand in) and the mini-boss h_d_x, shut behind its damage filter until then: shoot it down (h_d_x_counter: 55 hits, added when the first human reaches p2_s4_once_add_hp) while p2_s4_green_laser_timer drops a green laser every 1.1-2 s (template_z_1_x_laser / z_2_x: 99999). Its death opens the way to p2_s4_once_after_blocks: 8 s later the last lift (p2_s4_end_move_circular, 570 u/s, 8,500 units up) leaves, and from 8.5 s the spinning beams above it (w_z_a_q: a 999999 beam every 0.14-0.28 s) until it reaches the top. Win at p2_s4_once_win_humans (STAGE COMPLETED). Ours, for the zombies a server has: still on the arena floor once the platform rises, on the corridor platform 15 s after it stops, or below the lift 4 s after it leaves, and they have caught you.",
+      "spawn": {
+        "origin": [9000, -488, -13824],
+        "yaw": 0
+      },
+      "view": {
+        "min": [0, -17500, -15300],
+        "max": [17500, 7000, 5500]
+      },
+      "fastForward": 1,
+      "start": [
+        { "target": "Map_Warmup_relay", "input": "Kill" },
+        { "target": "Relay_Pick_Random_Stage", "input": "Kill" },
+        { "target": "fog", "input": "SetStartDist", "param": "5800", "delay": 0.02 },
+        { "target": "fog", "input": "SetEndDist", "param": "19000", "delay": 0.02 },
+        { "target": "template_stage4", "input": "ForceSpawn" },
+        { "target": "template_boss_lifeform", "input": "ForceSpawn" },
+        { "target": "s4_boss_end_relay", "input": "Trigger", "delay": 0.05 }
+      ],
+      "bosses": [
+        { "target": "h_d_x_hitbox", "name": "h_d_x", "counter": "h_d_x_counter", "counterMode": "hits" }
+      ],
+      "win": { "target": "p2_s4_once_win_zm", "input": "Kill", "from": "p2_s4_once_win_humans" },
+      "loseTo": [
+        "stage4_zm_moving_plat_corridor"
+      ],
+      "caught": [
+        {
+          "after": 22,
+          "area": {
+            "min": [5500, -2200, -14700],
+            "max": [13600, 1800, -13795]
+          },
+          "name": "the zombies (missed the platform)"
+        },
+        {
+          "on": { "target": "phase2_door_move_c", "input": "Kill" },
+          "delay": 12,
+          "area": {
+            "min": [5500, -10050, -6200],
+            "max": [13600, 1000, -4500]
+          },
+          "name": "the zombies (still on the platform)"
+        },
+        {
+          "on": { "target": "p2_s4_end_move_circular", "input": "Open" },
+          "delay": 4,
+          "area": {
+            "min": [5500, -15500, -8200],
+            "max": [13600, -9000, -4600]
+          },
+          "name": "the zombies (missed the last lift)"
+        }
+      ]
+    }
+  ]
+}

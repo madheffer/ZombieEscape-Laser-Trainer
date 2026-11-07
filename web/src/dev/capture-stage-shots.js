@@ -73,7 +73,16 @@ export async function captureStage(i, { settle = 300, maxPitch = 12, prepare = n
     if (p && Number.isFinite(p.pitch)) p.pitch = Math.max(-maxPitch, Math.min(maxPitch, p.pitch));
     if (prepare) { if (!L.paused) L.pause(); await prepare(L); }
     await sleep(settle); // a couple of frames at the spawn: the camera is the player's view
-    const blob = await grab(L, card ? { w: CARD_W, h: CARD_H, quality: CARD_QUALITY } : {});
+    // entities where the simulation has them now: the frame loop draws them from a history `delay` (the simulated
+    // ping) behind, which after a prepare's advance() shows a moving platform where it was (above the camera)
+    const r = L.renderer;
+    const delay = r.delay;
+    r.delay = 0;
+    let blob;
+    try {
+      r.updateEntities(L.engine.time);
+      blob = await grab(L, card ? { w: CARD_W, h: CARD_H, quality: CARD_QUALITY } : {});
+    } finally { r.delay = delay; }
     const out = await upload(L.map.name, s.id, blob, card ? 'card' : 'stage');
     return { id: s.id, bytes: out.bytes };
   } finally {

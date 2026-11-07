@@ -61,13 +61,33 @@ sealed class Bsp
         if (d.Length < 1036 || Encoding.ASCII.GetString(d, 0, 4) != "VBSP") throw new InvalidDataException("not a VBSP file");
         b.Version = BitConverter.ToInt32(d, 4);
         if (b.Version is < 19 or > 21) throw new InvalidDataException($"VBSP version {b.Version} not supported (19-21: CS:S, CS:GO)");
+        var unpacked = new List<(int Lump, byte[] Bytes)>();
         for (var i = 0; i < 64; i++)
         {
             int ofs = BitConverter.ToInt32(d, 8 + i * 16), len = BitConverter.ToInt32(d, 12 + i * 16), fourCC = BitConverter.ToInt32(d, 20 + i * 16);
             if (ofs < 0 || len < 0 || (long)ofs + len > d.Length) throw new InvalidDataException($"lump {i} outside the file");
-            // an LZMA-compressed lump (console / some CS:GO bakes) is read as empty rather than as garbage
-            b.Lumps[i] = fourCC != 0 && i != LumpPakfile && i != LumpGame ? (0, 0) : (ofs, len);
-            if (fourCC != 0 && i != LumpPakfile && i != LumpGame) Console.WriteLine($"  lump {i} is compressed: skipped");
+            b.Lumps[i] = (ofs, len);
+            // fourCC = the uncompressed size of an LZMA lump (bspzip -compress packs every lump but the game lump
+            // directory and the pakfile, whose entries are packed one by one: GameLump, GameFiles)
+            if (fourCC == 0 || i == LumpPakfile || i == LumpGame || len == 0) continue;
+            try { unpacked.Add((i, Lzma.DecodeSource(d.AsSpan(ofs, len)))); }
+            catch (Exception e) when (e is InvalidDataException or IndexOutOfRangeException)
+            {
+                Console.WriteLine($"  lump {i} is compressed and unreadable ({e.Message}): skipped");
+                b.Lumps[i] = (0, 0);
+            }
+        }
+        if (unpacked.Count > 0)
+        {
+            // the unpacked lumps go after the file's own bytes, so game lump offsets (from the file start) still hold
+            var total = d.LongLength + unpacked.Sum(u => (long)u.Bytes.Length);
+            if (total > System.Array.MaxLength) throw new InvalidDataException("unpacked map too large");
+            var all = new byte[total];
+            d.CopyTo(all, 0);
+            var at = d.Length;
+            foreach (var (lump, bytes) in unpacked) { bytes.CopyTo(all, at); b.Lumps[lump] = (at, bytes.Length); at += bytes.Length; }
+            b.Data = d = all;
+            Console.WriteLine($"  {unpacked.Count} LZMA lumps unpacked");
         }
         b.Planes = b.Array(LumpPlanes, 20, (o) => new Plane(V3(d, o), F(d, o + 12)));
         b.Vertexes = b.Array(LumpVertexes, 12, (o) => V3(d, o));
@@ -129,8 +149,17 @@ sealed class Bsp
             var tag = Encoding.ASCII.GetString(new[] { Data[o + 3], Data[o + 2], Data[o + 1], Data[o] });
             if (tag != id) continue;
             int flags = U16(Data, o + 4), ver = U16(Data, o + 6), fo = I(Data, o + 8), fl = I(Data, o + 12);
-            if (flags != 0) { Console.WriteLine($"  game lump {id} is compressed: skipped"); return null; }
             if (fo < 0 || fl < 0 || (long)fo + fl > Data.Length) return null;
+            if (flags != 0)
+            {
+                // GAMELUMPFLAG_COMPRESSED: an lzma_header_t block
+                try { return (ver, Lzma.DecodeSource(Data.AsSpan(fo, Data.Length - fo))); }
+                catch (Exception e) when (e is InvalidDataException or IndexOutOfRangeException)
+                {
+                    Console.WriteLine($"  game lump {id} is compressed and unreadable ({e.Message}): skipped");
+                    return null;
+                }
+            }
             return (ver, Data.AsSpan(fo, fl).ToArray());
         }
         return null;

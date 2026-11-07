@@ -11,6 +11,8 @@
 //   ]
 // `after`: s since the stage started; `on` (+ `delay`): when the map's own input arrives (its first time). An `area`
 // rule catches whoever is inside it (feet position) from then on; one without an area ends the run there unless won.
+// Endless runs skip the rules (you play until you die), except one marked `"endless": true`: a place that would
+// otherwise be a safe spot to wait out an endless run in (ze_lifeforms' arena floor under the rising platform).
 import { inputMatcher } from '../lib/names.js';
 
 const finite = (v) => typeof v === 'number' && Number.isFinite(v);
@@ -24,7 +26,7 @@ function cleanRules(list) {
     const area = r.area && vec3(r.area.min) && vec3(r.area.max) ? { min: r.area.min, max: r.area.max } : null;
     const on = r.on && typeof r.on.target === 'string' && typeof r.on.input === 'string' ? r.on : null;
     if (!on && !finite(r.after)) continue;
-    out.push({ after: finite(r.after) ? r.after : null, on, delay: finite(r.delay) ? Math.max(0, r.delay) : 0, area, name: typeof r.name === 'string' ? r.name.slice(0, 80) : '' });
+    out.push({ after: finite(r.after) ? r.after : null, on, delay: finite(r.delay) ? Math.max(0, r.delay) : 0, area, name: typeof r.name === 'string' ? r.name.slice(0, 80) : '', endless: r.endless === true });
   }
   return out;
 }
@@ -49,9 +51,10 @@ const inside = (p, a) => p[0] >= a.min[0] && p[0] <= a.max[0] && p[1] >= a.min[1
 
 // The rule that catches a player standing at `origin` (feet) this tick, or null. Call once a tick while alive.
 export function caughtBy(run, origin) {
-  if (!run?.caught?.length || !run.started || run.endless) return null;
+  if (!run?.caught?.length || !run.started) return null;
   const t = run.engine.time;
   for (const r of run.caught) {
+    if (run.endless && !r.endless) continue;
     if (r.at == null && r.after != null) r.at = run.startTime + r.after;
     if (r.at == null || t < r.at) continue;
     if (!r.area || inside(origin, r.area)) return r;

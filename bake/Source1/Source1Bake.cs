@@ -34,7 +34,15 @@ static class Source1Bake
         if (csgo == null) Log("WARNING: no CS:GO install found (--csgo <csgo dir>): stock textures will be missing");
         // + the platform VPK beside the game folder, the engine's last search path (hlmv/gray: ze_xenovation's sky box)
         var platform = csgo != null ? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(csgo).TrimEnd('\\', '/')) ?? "", "platform", "platform_pak01_dir.vpk") : null;
-        using var files = new GameFiles(bsp.Lump(Bsp.LumpPakfile).ToArray(), csgo != null ? [Path.Combine(csgo, "pak01_dir.vpk"), .. File.Exists(platform) ? new[] { platform! } : []] : []);
+        // a CS:S map (VBSP 19 / 20) first looks in CS:S's own VPKs, as its engine does (cs_italy/white, de_tides/...),
+        // when CS:S is installed; CS:GO's pak after that for what it shares
+        var css = bsp.Version < 21 ? FindCss() : null;
+        var cssVpks = css == null ? [] : new[] { Path.Combine(css, "cstrike_pak_dir.vpk"), Path.Combine(css, "..", "hl2", "hl2_textures_dir.vpk"),
+            Path.Combine(css, "..", "hl2", "hl2_misc_dir.vpk") }.Where(File.Exists).ToArray();
+        if (bsp.Version < 21 && css == null) Log("no CS:S install found (LASERS_CSS=<...>/cstrike): CS:S stock content comes from CS:GO, else a substitute");
+        using var files = new GameFiles(bsp.Lump(Bsp.LumpPakfile).ToArray(),
+            [.. cssVpks, .. csgo != null ? new[] { Path.Combine(csgo, "pak01_dir.vpk") } : [], .. File.Exists(platform) ? new[] { platform! } : []])
+            { ForeignStock = bsp.Version < 21 && cssVpks.Length == 0 };
         foreach (var s in files.Sources) Log($"+ {s}");
 
         if (only != null) return RunOnly(only, files, mapName, outDir);
@@ -282,6 +290,19 @@ static class Source1Bake
                 var p = Path.Combine(lib, "steamapps", "common", game, "csgo");
                 if (File.Exists(Path.Combine(p, "pak01_dir.vpk"))) return p;
             }
+        return null;
+    }
+
+    // CS:S's cstrike folder: LASERS_CSS, else a Steam library's "Counter-Strike Source/cstrike" with its cstrike_pak_dir.vpk
+    static string? FindCss()
+    {
+        var env = Environment.GetEnvironmentVariable("LASERS_CSS");
+        if (!string.IsNullOrEmpty(env)) return File.Exists(Path.Combine(env, "cstrike_pak_dir.vpk")) ? Path.GetFullPath(env) : null;
+        foreach (var lib in Program.SteamLibraries())
+        {
+            var p = Path.Combine(lib, "steamapps", "common", "Counter-Strike Source", "cstrike");
+            if (File.Exists(Path.Combine(p, "cstrike_pak_dir.vpk"))) return p;
+        }
         return null;
     }
 
