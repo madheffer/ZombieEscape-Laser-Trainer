@@ -119,8 +119,14 @@ export function playerInput(engine, q, who = engine.playerEnt) {
   const inp = q.input.toLowerCase();
   const me = who;
   const P = me === engine.playerEnt ? engine.player : null; // { setHealth, setMaxHealth, setGravity, setSpeed, setRunSpeed, setVelocity, setDamageFilter }
-  // a player has no outputs a map would add: CS2's AddOutput on a pawn changes nothing we model
-  if (inp === 'addoutput') { engine.warnOnce('player.addoutput', 'AddOutput on the player ignored'); return; }
+  // a player has no outputs a map would add: CS2's AddOutput on a pawn changes nothing we model. Source 1's
+  // "key value" is a KeyValue (as addOutputSource1): ze_nora's 01B_start_heal sets "max_health 250" this way
+  if (inp === 'addoutput') {
+    const key = String(q.param ?? '').split(' ')[0];
+    if (engine.source1 && key && !/^(on|out)/i.test(key)) return playerInput(engine, { ...q, input: 'KeyValue' }, who);
+    engine.warnOnce('player.addoutput', 'AddOutput on the player ignored');
+    return;
+  }
   if (me.mate) {
     if (inp.startsWith('keyvalue')) { const r = parseKeyValue(engine, q.param, 'player'); if (r?.key === 'targetname') { me.name = r.t[1]; me.key = stripName(r.t[1]); } return; }
     if (inp === 'addcontext') (me.contexts ||= new Set()).add(String(q.param).split(':')[0].toLowerCase());

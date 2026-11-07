@@ -30,7 +30,7 @@ import './classes/fade.js';
 import './classes/scripts.js';
 import './classes/color-correction.js';
 import './classes/skybox-swapper.js';
-import { runScriptCode } from './classes/vscripts.js';
+import { runScriptCode, isVscriptAdd } from './classes/vscripts.js';
 import { fogState } from './classes/fog.js';
 import { skyState } from './classes/sky.js';
 import { postState } from './classes/post.js';
@@ -365,7 +365,9 @@ export class EntityEngine {
       const p = c.param !== '' && c.param != null ? stripPrefix(c.param) : (param != null ? String(param) : '');
       const inl = c.input.toLowerCase();
       // a point_script port's add (classes/scripts.js: bosshud.js' AlienNAddHealth) counts per human the same way
-      const isAdd = fromTouch && (inl === 'addhealth' || inl === 'add' || (inl === 'runscriptinput' && !!this.scriptAdds?.has(p.toLowerCase())));
+      // and so does a Source 1 VScript port's (classes/vscripts.js: ze_nora's hp_one_cal())
+      const isAdd = fromTouch && (inl === 'addhealth' || inl === 'add' || (inl === 'runscriptinput' && !!this.scriptAdds?.has(p.toLowerCase()))
+        || (inl === 'runscriptcode' && this.source1 && isVscriptAdd(p)));
       if (isAdd && reTouch && !e.io.some((o) => o.output.toLowerCase() === 'onendtouch' && o.target === c.target)) {
         if (c.times > 0 && --c.times === 0) { e.io.splice(i, 1); i--; }
         continue;

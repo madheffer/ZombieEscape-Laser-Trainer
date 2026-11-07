@@ -24,6 +24,7 @@ import { installEndless } from '../app/endless.js';
 import { inputMatcher, nameKey, nameMatches, stripPrefix } from '../lib/names.js';
 import { own } from '../lib/storage.js';
 import { createPhysicsWorld } from './physics-world.js';
+import { installCaught, caughtText } from './caught.js';
 
 export const TICK = 1 / 64;
 // s from the spawn to the stage's start, solo and in a round: time to look around, and for a round's guests to click
@@ -97,6 +98,8 @@ export function createRunEngine({ entities, hulls, bounds, animations, soundDura
     });
   }
   if (endless) run.endlessTick = installEndless(engine, scenario, run.fireStart);
+  // `caught`: where and when the zombies the map relies on would have caught a human who stalls (world/caught.js)
+  installCaught(engine, scenario, run);
 
   // items: the map items (world/items.js mapItems entries) this player holds. Handed over BEFORE the replay, as a holder
   // carries them through the whole round: the map's own item rules during the replay reach them (mist: relay_escape
@@ -249,6 +252,7 @@ export function hazardName(source, scenario) {
   if (source === 'fall') return 'Fall damage';
   if (source === 'void') return 'the void';
   if (source === 'cage') return 'the zombies (sent to the zombie cage)';
+  if (source?.caught) return caughtText(source.caught); // world/caught.js
   const raw = typeof source === 'string' ? source : (source?.name || '');
   const key = stripPrefix(raw).replace(/&\d+$/, '');
   const named = own(scenario?.hazards, key);

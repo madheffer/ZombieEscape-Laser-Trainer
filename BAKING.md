@@ -241,6 +241,10 @@ removes textures nothing uses any more and stamps `crop` in the manifest. Entiti
 ze_xenovation_v3_5: `--box -9600 10600 -15400 -900 16000 -3000 --box -15200 0 -11600 -10000 16400 -6000 --box -1900 2300 800 1900 15700 3300`
 (relay10's shaft with the tp16 room and the zombie cage, level 1's laser corridor, level 2's arena: world 3.2 MB -> 358 KB). Its source is the map's .bsp (`ze_xenovation_v3_5.zip`, not on
 the workshop: bake it from the .bsp).
+ze_nora_v1_11: `--box -2100 300 600 100 2100 2300 --box -4300 300 2000 -300 6200 3700 --box -4000 -11800 500 -500 -1200 3700`
+(the warmup boss platform, level 2's boss arena, level 3's tree path: world 25,197 -> 1,495 triangles, 2 MB -> 125 KB). Its
+source is `ze_nora_v1_11.rar` (the .bsp inside; not on the workshop). Then the map card: `maps/ze_nora_v1_11/card.webp`
+is a 640x240 crop of a screenshot of the tree path, not a capture.
 
 ## Single steps
 

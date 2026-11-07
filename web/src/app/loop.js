@@ -12,6 +12,7 @@ import { useItems as pressItems } from '../world/items.js';
 import { pressMateUses } from '../world/run-engine.js';
 import { startScenario, hurtPlayer, healPlayer, finish, stageTime, landing } from './session.js';
 import { startIfDue, mapRuns, winDue, sentOut } from '../world/run-engine.js';
+import { caughtBy } from '../world/caught.js';
 import { bossHudHtml } from '../ui/hud.js';
 import { formatTime, plural } from '../lib/format.js';
 import { getRecord } from './records.js';
@@ -275,6 +276,9 @@ export function step() {
     }
   }
   if (run.done) return;
+  // the stage's `caught` rule: stalling where the zombies would have caught you (world/caught.js)
+  const caught = caughtBy(run, player.origin);
+  if (caught && !run.spectating && !godMode()) { run.killedBy = { caught }; finish('dead'); return; }
   teamAndEnd(run);
   if (run.spectating || run.done) return;
   if (player.origin[2] < -20000) {

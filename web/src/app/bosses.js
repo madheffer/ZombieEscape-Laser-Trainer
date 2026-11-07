@@ -233,8 +233,13 @@ export function bossStatus(b) {
     const seg = run.segMax?.get(b.target) || cur;
     hp = Math.max(0, c.state.v - 1) * seg + Math.min(cur, seg);
     peak = Math.max(c.state.max || c.state.v, c.state.v) * seg;
-  } else if (e?.state.health != null) hp = Math.max(0, e.state.health + off);
-  else return null;
+  } else if (e?.state.health != null) {
+    // "spawnHealthPlaceholder": the breakable spawns at a filler health the map replaces with SetHealth (ze_nora's
+    // 20B_Boss_Hp_<n>: 99999, then 1000 + 1200 per human a second later). Off the HUD until then, or the filler
+    // would be its 100% and the set would count as the first hit
+    if (b.spawnHealthPlaceholder && e.state.health === e.state.max) return null;
+    hp = Math.max(0, e.state.health + off);
+  } else return null;
   if (peak == null) {
     peak = Math.max(run.bossPeak.get(b.target) || 0, hp);
     run.bossPeak.set(b.target, peak);

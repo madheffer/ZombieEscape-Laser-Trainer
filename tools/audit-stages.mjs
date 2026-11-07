@@ -20,6 +20,7 @@ import { normaliseHulls } from '../web/src/world/hulls.js';
 import { CollisionWorld } from '../web/src/world/collision.js';
 import { spawnsHidden } from '../web/src/world/entities/render-mode.js';
 import { createRunEngine, startIfDue, mapRuns, winDue, sentOut, TICK } from '../web/src/world/run-engine.js';
+import { caughtBy, caughtText } from '../web/src/world/caught.js';
 import { isParticleSystem } from '../web/src/world/entities/index.js';
 import { nameKey } from '../web/src/lib/names.js';
 import { assetKey } from '../web/src/lib/paths.js';
@@ -161,6 +162,9 @@ for (const sc of stages) {
       // a teleport into the stage's `loseTo` (a holding pen) ends the run as a death does (world/run-engine.js sentOut)
       if (ev.type === 'teleport' && run.started && !dead && sentOut(sc, ev.dest)) dead = { t: engine.time - run.startTime, by: `${ev.trigger?.name || 'teleport'} -> ${ev.dest.name}` };
     }
+    // the stage's `caught` rule (world/caught.js): stalling at the spawn is a death too
+    const caught = !dead && caughtBy(run, at);
+    if (caught) dead = { t: engine.time - run.startTime, by: `caught: ${caughtText(caught)}` };
     if (winDue(run, sc.winAfter)) winNow();
   }
   // a drill that ends on the clock must outlast its own attack: hurts that turn on after the win (laser2's altar

@@ -1,0 +1,230 @@
+{
+  "map": "ze_nora_v1_11",
+  "title": "Nora",
+  "engine": "csgo",
+  "description": "LzYoRHa's neon ZE map (CS:GO, baked from its BSP). Its three scripted bosses: the warmup boss's 165 s of attacks on a round platform, level 2's boss backing down the arena in three stages then the laser ending, and level 3's run up the rising path to the tree, as level 3 plays it and as the harder RTV level does.",
+  "scenarios": [
+    {
+      "id": "warmup_boss",
+      "group": "Bosses",
+      "featured": true,
+      "name": "Warmup boss",
+      "summary": "Survive 165 s of attacks on a round platform",
+      "description": "The warmup (Map_LVL 1). As the first human lands on the platform, 01B_Start_trigger calls zero_one_b_boss_fight() (boss_fight.nut, ported) and starts Megalovania 5 s in; 01B_start_heal sets 250 HP. Every attack is on the script's fixed clock: pushes faster than you run (290 u/s for 10 s: 01B_1_1_ATK toward -y 5-15 s, 01B_1_2_ATK toward +x 17-27 s), so start them from the far side, sliding walls with two gaps (01B_2_*, 40 a touch, 27-38 s), indicator then beam lasers across the platform (01B_3_*: the L1 / L2 lines 998, the S / X shapes 100; 40-74 s and 122 s), sweeping bars from both sides (01B_4_*, 01B_8_*, 50; 54-65 s, 80-108 s, 147-162 s), 01B_5 drops 79-92.5 s, the floor's four sides open at 110 s with 01B_6_Push throwing you outward 112-122 s, and 01B_7 strikes every 1.5 s from 127 s. Falling off is 01Boss_Fall_Hurt (998). Win at 165 s, when 01B_End_Tele_Temp spawns the way out.",
+      "spawn": {
+        "origin": [
+          -1023,
+          1024,
+          921
+        ],
+        "yaw": 90
+      },
+      "view": {
+        "min": [
+          -2100,
+          300,
+          700
+        ],
+        "max": [
+          100,
+          2100,
+          2200
+        ]
+      },
+      "arrive": [
+        "01B_Start_trigger",
+        "01B_start_heal"
+      ],
+      "win": {
+        "target": "01B_End_Tele_Temp",
+        "input": "ForceSpawn"
+      }
+    },
+    {
+      "id": "level2_boss",
+      "group": "Bosses",
+      "featured": true,
+      "name": "Level 2 boss",
+      "summary": "Shoot it down in three stages, then the laser ending",
+      "description": "Level 2's end, from where lvl_twp_boss_tp_ct() puts the CTs. 20B_Pre_Boss_Trigger plays Anhedonia; jump the 128-unit gaps onto and off the two side bridges into the arena before they break at 20 s, 20B_Boss_Start_Push pushes everyone up the arena at 25 s and the boss spawns at its far end at 35 s (20B_Boss_Temp). Three stages of 60 s: between them the boss comes down the arena on its track (20B_Boss_TrackTrain) and the floor you stood on breaks behind it (20B_Boss_pt_1 / 2). Each stage's 20B_Boss_Hp_<n> has 1000 + 1200 HP per human (lvl2_boss_control.nut, ported: hp_<n>_cal on every human entering the stage's controller zone, set_hp_<n> a second in; a human leaving it takes 1200 back) and must break inside its 60 s, or its wall (20B_Boss_Stage_Wall_<n>) keeps you on the floor that breaks. Every 6-10 s the stage's picker runs one attack: Pull (a push toward the boss), Diamond (two of four crystals, 999), Wall (six random walls from the sides), Flame (an indicator, then the fire 3 s later, 50) or Push. Touching the boss is 100. Stage 3 must break before 20B_timelimit (50) is enabled at 61 s; then the bridges rise, 20B_Boss_pt_3 opens, and 20B_laser_picker fires one east and one west laser every 2.5 s for 10 s. Win at lvl_2_end_checker, back at the far end, 25 s after the path opens. A fall (20B_fall_tp) puts you behind the broken bridge: out. Ours, for the zombies a server has: still on the start platform 21 s in (the bridges broke at 20 s), or not at the end checker 15 s after it opens, and they have caught you.",
+      "spawn": {
+        "origin": [
+          -2313,
+          521,
+          2740
+        ],
+        "yaw": 90
+      },
+      "view": {
+        "min": [
+          -4300,
+          300,
+          2000
+        ],
+        "max": [
+          -300,
+          6200,
+          3700
+        ]
+      },
+      "arrive": [
+        "20B_Pre_Boss_Trigger"
+      ],
+      "bosses": [
+        {
+          "target": "20B_Boss_Hp_1",
+          "name": "Boss (stage 1)",
+          "spawnHealthPlaceholder": true
+        },
+        {
+          "target": "20B_Boss_Hp_2",
+          "name": "Boss (stage 2)",
+          "spawnHealthPlaceholder": true
+        },
+        {
+          "target": "20B_Boss_Hp_3",
+          "name": "Boss (stage 3)",
+          "spawnHealthPlaceholder": true
+        }
+      ],
+      "win": {
+        "target": "sp_logic_script",
+        "input": "RunScriptCode",
+        "from": "lvl_2_end_checker"
+      },
+      "loseTo": [
+        "20B_fall_tp_dest"
+      ],
+      "caught": [
+        {
+          "after": 21,
+          "area": {
+            "min": [
+              -4200,
+              -100,
+              2600
+            ],
+            "max": [
+              -400,
+              1100,
+              3200
+            ]
+          },
+          "name": "the zombies (left on the start platform)"
+        },
+        {
+          "on": {
+            "target": "lvl_2_end_checker",
+            "input": "Enable"
+          },
+          "delay": 15,
+          "name": "the zombies (too slow to the end)"
+        }
+      ]
+    },
+    {
+      "id": "level3_ending",
+      "group": "Ending",
+      "featured": true,
+      "name": "Level 3 ending: the tree",
+      "summary": "Run the rising path to the tree through the lasers",
+      "description": "Level 3's end (Map_LVL 4). 3_2_trigger plays Ascension and calls three_two() (lv3_controller.nut, ported); the floor under you breaks at 10 s. From 10 s the path rises in front of you a platform every 0.75 s (3_2_rise_1-32), the first stretch falls away at 34-38 s, and from 40 s the second stretch rises every 0.5 s (3_2_rise_end_1-100) toward the tree, which explodes at 61 s. Level 3 adds the lasers: from 45 s a C or J shaped laser every 5 s, then every 3 s, then every 1.5 s (3_2_CJ_laser_picker*, 5000), and from 60 s a wall laser every 6 s, then every 3 s (3_2_Wall_laser_picker). A fall (3_Troll_tele) lands you on the zombies' platform beside the path (3_2_fall_dest), and 3_2_fall_tp_1 / 2 (40 s / 120 s) send whoever is still on the old stretch to theirs: out. The win check (lv_3_human_win_check) opens at 120 s and lv_3_nuke kills everything behind it at 130 s. Ours, for the zombies a server has: not through the win check 5 s after the nuke, and they have caught you.",
+      "spawn": {
+        "origin": [
+          -2253,
+          -11386,
+          1201
+        ],
+        "yaw": 90
+      },
+      "view": {
+        "min": [
+          -4000,
+          -11800,
+          500
+        ],
+        "max": [
+          -500,
+          -1200,
+          3200
+        ]
+      },
+      "setup": [
+        {
+          "target": "Map_LVL",
+          "input": "AddOutput",
+          "param": "health 4"
+        }
+      ],
+      "arrive": [
+        "3_2_trigger"
+      ],
+      "win": {
+        "target": "sp_logic_script",
+        "input": "RunScriptCode",
+        "from": "lv_3_human_win_check"
+      },
+      "loseTo": [
+        "3_2_fall_dest",
+        "3_2_fall_dest_1",
+        "3_2_fall_dest_2"
+      ],
+      "caught": [
+        {
+          "on": {
+            "target": "lv_3_nuke",
+            "input": "Enable"
+          },
+          "delay": 5,
+          "name": "the zombies (too slow to the end)"
+        }
+      ]
+    },
+    {
+      "id": "rtv_ending",
+      "group": "Ending",
+      "name": "RTV ending: the tree, faster",
+      "summary": "The tree run with the lasers twice as often",
+      "description": "The RTV level (Map_LVL 12: what the map plays after an RTV, the ending alone). The same run as level 3's (three_two(), lv3_controller.nut), but the C / J lasers come every 2 s from 60 s and every second from 96 s, and the wall lasers every 4 s, then every 2 s. There is no win check: at 120 s 3_Troll_tele stops catching falls and at 130 s 3_2_troll_nuke ends the round. Win when you are still on the path at 120 s; a fall lands you with the zombies, as on level 3.",
+      "spawn": {
+        "origin": [
+          -2253,
+          -11386,
+          1201
+        ],
+        "yaw": 90
+      },
+      "view": {
+        "min": [
+          -4000,
+          -11800,
+          500
+        ],
+        "max": [
+          -500,
+          -1200,
+          3200
+        ]
+      },
+      "setup": [
+        {
+          "target": "Map_LVL",
+          "input": "AddOutput",
+          "param": "health 12"
+        }
+      ],
+      "arrive": [
+        "3_2_trigger"
+      ],
+      "win": {
+        "target": "3_Troll_tele",
+        "input": "Disable"
+      },
+      "loseTo": [
+        "3_2_fall_dest",
+        "3_2_fall_dest_1",
+        "3_2_fall_dest_2"
+      ]
+    }
+  ]
+}

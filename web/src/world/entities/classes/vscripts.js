@@ -10,10 +10,26 @@
 // its own variables (e.state.vs).
 import { own } from '../../../lib/storage.js';
 import queen from './vscript-ports/dark-fantasy-queen.js';
+import noraBossFight from './vscript-ports/nora-boss-fight.js';
+import noraLvl2Boss from './vscript-ports/nora-lvl2-boss.js';
+import noraLv3 from './vscript-ports/nora-lv3.js';
+import noraMain from './vscript-ports/nora-main.js';
 
 const PORTS = {
   'ze_surf_dark_fantasy/bosshp_queen': queen,
+  'lzyorha/_mapscripts/ze_nora/boss_fight': noraBossFight,
+  'lzyorha/_mapscripts/ze_nora/lvl2_boss_control': noraLvl2Boss,
+  'lzyorha/_mapscripts/ze_nora/lv3_controller': noraLv3,
+  'lzyorha/_mapscripts/ze_nora/main': noraMain,
 };
+
+// A port's `adds`: functions that grow a boss's HP once per human who touches a trigger (nora's hp_one_cal()). The
+// engine repeats an OnStartTouch's RunScriptCode of only these once per simulated human, like an AddHealth.
+const ADDS = new Set(Object.values(PORTS).flatMap((p) => (p.adds || []).map((f) => f.toLowerCase())));
+export function isVscriptAdd(code) {
+  const calls = parseCalls(code);
+  return !!calls?.length && calls.every(([fn]) => ADDS.has(fn.toLowerCase()));
+}
 
 // "ze_surf_dark_fantasy/bosshp_queen.nut" -> the PORTS key (the key may list several files: the first with a port)
 function portOf(e) {
