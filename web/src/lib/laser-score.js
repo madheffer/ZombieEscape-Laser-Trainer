@@ -9,4 +9,4 @@ export const SCORE_DODGE = 1, SCORE_WIN = 10, SCORE_MVP = 5;
 export const laserScore = (t) => (t.lasers + t.balls) * SCORE_DODGE + t.wins * SCORE_WIN + t.mvps * SCORE_MVP;
 
 // an empty tally: what a player who just joined the room has
-export const emptyTally = () => ({ lasers: 0, balls: 0, wins: 0, losses: 0, mvps: 0 });
+export const emptyTally = () => ({ lasers: 0, balls: 0, boss: 0, wins: 0, losses: 0, mvps: 0 });

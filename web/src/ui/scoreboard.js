@@ -10,7 +10,7 @@
 import './scoreboard.css';
 
 const COLUMNS = [ // [label, row key, cell class]
-  ['Lasers', 'lasers'], ['Balls', 'balls'], ['Wins', 'wins'], ['Losses', 'losses'], ['MVPs', 'mvps', 'mvps'], ['Score', 'score', 'score'],
+  ['Lasers', 'lasers'], ['Balls', 'balls'], ['Wins', 'wins'], ['Losses', 'losses'], ['Boss DMG', 'boss', 'damage'], ['Score', 'score', 'score'],
 ];
 // CS2's column shading (scoreboard.vts _InitStatCell / _HighlightSortStatLabel): every second stat cell is dark
 // (sb-row__cell--dark, counted from the first stat column), and the column the board is sorted by (casual: score)
@@ -131,9 +131,6 @@ export class Scoreboard {
     if (r.flash != null) { hl.classList.add('sb-player-pulse-death'); hl.style.animationDelay = `${-r.flash}ms`; }
     const status = cell('status');
     if (r.dead) status.append(el('div', 'sb-status-image sb-team-tint'));
-    const mvp = cell('mvps');
-    if (r.mvps > 0) mvp.append(el('div', 'sb-row__cell--mvps__star sb-team-tint'));
-    if (r.mvps > 1) mvp.append(el('span', 'sb-row__cell--mvps__count sb-team-tint', r.mvps));
     hl.append(
       status,
       cell('ping', el('span', '', r.ping)),
@@ -141,7 +138,7 @@ export class Scoreboard {
       cell('avatar', el('div', `sb-avatar sb-avatar--${team}`)),
       cell('name', el('span', 'sb-team-tint', r.name)),
       ...COLUMNS.map(([, key, cls], i) => {
-        const c = cls === 'mvps' ? mvp : cell(cls || 'stat', el('span', 'sb-team-tint', r[key]));
+        const c = cell(cls || 'stat', el('span', 'sb-team-tint', r[key]));
         c.className += shade(i, cls);
         return c;
       }),

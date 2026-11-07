@@ -5,7 +5,7 @@
    + 10 px, the score 80 x 80 (Stratum2 Mono bold 70, shadow 2 2 3 #00000080), name / "Alive" 20 px (the count at
    0.2 opacity); rows .sb-row 830 (.highlight-row 770) with 1 px above and below, cells 24 tall and 50 wide on
    #ffffff08 (status / ping / flair / avatar / name on #ffffff05), labels 18 px with 6 px sides; ping 37 wide #888;
-   status 24 (2 px in), flair 135 % of 24, avatar 24; the MVP star 16 px with its count 10 px, 8 px right. Team tints
+   status 24 (2 px in), flair 135 % of 24, avatar 24; Team tints
    color-CT #B5D4EE / color-T #EAD18A (csgostyles). Your row: rgba(0,166,255,0.07) (CT) / rgba(255,238,0,0.07) (T).
    Dead: wash #999 over the row (Panorama's wash multiplies: 60 % brightness), no cell backgrounds; dying flashes red
    (.sb-player-pulse-death: wash red, brightness 10) for CS2's 1 s pulse. Spectators 0.8 opacity, no cell backgrounds.
@@ -134,13 +134,13 @@
   font-family: 'Stratum2 Medium', 'Arial Unicode MS', sans-serif; margin: 0; text-align: left;
   overflow: hidden; text-overflow: ellipsis;
 }
-.scoreboard .sb-row__cell--mvps { position: relative; }
+.scoreboard .sb-row__cell--damage { width: calc(64 * var(--u)); } /* our boss damage (GFL shows it where CS2 has MVPs): CS2's 64 px stat width, so the label fits */
 .scoreboard .sb-avatar { width: 100%; height: 100%; background: center / cover no-repeat; }
 .scoreboard .sb-avatar--CT { background-image: url('/panorama/icons/scoreboard/avatar-ct.png'); }
 .scoreboard .sb-avatar--TERRORIST { background-image: url('/panorama/icons/scoreboard/avatar-terrorist.png'); }
 .scoreboard .sb-spec { font-family: 'Stratum2 Mono', 'Arial Unicode MS', monospace; font-size: calc(12 * var(--u)) !important; }
 
-/* team tint: names, stats, the X and the star */
+/* team tint: names, stats and the X */
 .scoreboard .sb-team--CT span.sb-team-tint { color: var(--ct); }
 .scoreboard .sb-team--TERRORIST span.sb-team-tint { color: var(--t); }
 .scoreboard .sb-team--CT div.sb-team-tint { background-color: var(--ct); }
@@ -148,15 +148,6 @@
 .scoreboard .sb-status-image {
   width: 100%; height: 100%;
   -webkit-mask: url('/panorama/icons/ui/elimination.svg') center / contain no-repeat; mask: url('/panorama/icons/ui/elimination.svg') center / contain no-repeat;
-}
-.scoreboard .sb-row__cell--mvps__star {
-  width: calc(16 * var(--u)); height: calc(16 * var(--u));
-  -webkit-mask: url('/panorama/icons/ui/star.svg') center / contain no-repeat; mask: url('/panorama/icons/ui/star.svg') center / contain no-repeat;
-}
-.scoreboard span.sb-row__cell--mvps__count {
-  position: absolute; top: 0; left: 50%; font-size: calc(10 * var(--u)); margin: 0;
-  transform: translateX(calc(4 * var(--u)));
-  line-height: 1;
 }
 
 /* dead (CS2: wash #999 over the row, cells without backgrounds) and the death flash */

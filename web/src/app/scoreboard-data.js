@@ -23,7 +23,7 @@ function row(id, name, ping, tally, extra) {
 }
 
 // -> { title, time, score: { humans, zombies }, humans: [row], zombies: [row], spec: [row], alive, total } or null
-// row: { id, name, ping, you, dead, flash (ms into its death flash, or null), lasers, balls, wins, losses, mvps, score }
+// row: { id, name, ping, you, dead, flash (ms into its death flash, or null), lasers, balls, boss, wins, losses, mvps, score }
 export function scoreboardData(now = performance.now()) {
   const room = net.room;
   if (!room) return null;
@@ -40,7 +40,7 @@ export function scoreboardData(now = performance.now()) {
       inRound.add(p.id);
       const base = mp.tallyBase.get(p.id) || emptyTally();
       // the round counted into the room already (its end): the room's totals; until then the start's + this round's
-      const tally = mp.ended && !sameTally(m.tally, base) ? m.tally : { ...base, lasers: base.lasers + p.lasers, balls: base.balls + p.balls };
+      const tally = mp.ended && !sameTally(m.tally, base) ? m.tally : { ...base, lasers: base.lasers + p.lasers, balls: base.balls + p.balls, boss: base.boss + p.boss };
       const since = p.alive ? 0 : now - p.diedWall; // how long they've been dead
       const r = row(p.id, m.name, m.ping, tally, { dead: !p.alive, flash: !p.alive && since < FLASH_MS ? Math.round(since) : null });
       (!p.alive && since >= ZR_RESPAWN_DELAY_MS ? zombies : humans).push(r);

@@ -499,7 +499,8 @@ Invite link and who is alive (with each player's ping). Change stage and Setting
   scoreboard.vxml / .vcss (`--panorama`), "Casual | <map>", the map clock, Humans / Zombies with the room's round score
   (stage cleared / lost), spectators under them. A row: elimination X when dead, ping, a badge slot (achievements, not
   in yet), avatar, name, then ours: Lasers, Balls (dodged, counted on the server's copy of each run), Wins, Losses,
-  MVPs, Score (`lib/laser-score.js`: 1 a dodge, 10 a win, 5 an MVP), room totals kept by `server/coop-tally.js`. A
+  Boss DMG (weapon hits landed on a boss, checked by the server; GFL shows it where CS2 has MVPs), Score
+  (`lib/laser-score.js`: 1 a dodge, 10 a win, 5 for the round's best run), room totals kept by `server/coop-tally.js`. A
   player who dies flashes red, dims, and slides to the Zombies after CS2Fixes' `zr_respawn_delay` (5 s).
 - **Versus**: the same stage side by side, last one alive wins. If both clear it, fewer hits wins.
 

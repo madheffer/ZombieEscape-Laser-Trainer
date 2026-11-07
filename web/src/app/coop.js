@@ -58,7 +58,7 @@ class Round {
     this.peerItems = new Map();
     for (const id of d.holders) if (id !== net.you && this.kit.heal) this.peerItems.set(id, [{ ...this.kit.heal, uses: 0, readyAt: 0 }]);
     if (d.ultima != null && d.ultima !== net.you && this.kit.ultima) this.peerItems.set(d.ultima, [{ ...this.kit.ultima, uses: 0, readyAt: 0 }]);
-    this.players = new Map(d.roster.map((m) => [m.id, { id: m.id, name: m.name, alive: true, deadAt: null, diedWall: 0, hits: 0, lasers: 0, balls: 0 }]));
+    this.players = new Map(d.roster.map((m) => [m.id, { id: m.id, name: m.name, alive: true, deadAt: null, diedWall: 0, hits: 0, lasers: 0, balls: 0, boss: 0 }]));
     this.me = net.you;
     this.ended = false;
     this.sendAt = 0; this.bossAt = 0;
@@ -338,12 +338,12 @@ function onGame(d, at = performance.now()) {
       break;
     case 'dead': if (Number.isInteger(d.id)) mp.markDead(d.id, cleanText(d.by, 40) || 'the map', num(d.at, 0, 1e6) ? d.at : stageTime(), cleanText(d.note, 30)); break;
     case 'bd': if (!mp.ended) applyHits(d.h); break;
-    // everyone's lasers / balls dodged so far, by the server's copies of the runs (the scoreboard: ui/scoreboard.js)
+    // everyone's lasers / balls dodged and boss hits so far, by the server (the scoreboard: ui/scoreboard.js)
     case 'score':
       if (!Array.isArray(d.s)) break;
       for (const e of d.s.slice(0, 8)) {
         const p = Array.isArray(e) && mp.players.get(e[0]);
-        if (p && num(e[1], 0, 1e6) && num(e[2], 0, 1e6)) { p.lasers = e[1] | 0; p.balls = e[2] | 0; }
+        if (p && num(e[1], 0, 1e6) && num(e[2], 0, 1e6)) { p.lasers = e[1] | 0; p.balls = e[2] | 0; p.boss = num(e[3], 0, 1e7) ? e[3] | 0 : 0; }
       }
       break;
     case 'leader': if (Number.isInteger(d.id)) mp.leader = d.id; break;

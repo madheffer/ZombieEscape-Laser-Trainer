@@ -24,7 +24,7 @@ const GRACE_MIN_MS = 15_000;
 const STALL_MS = 10_000;
 const WAIT_MS = 500; // the loading roster ('wait': who is ready, everyone's progress) goes out at most this often
 const CLOCK_MS = 250, BOSS_MS = 100;
-const SCORE_MS = 1000; // the scoreboard's lasers / balls dodged (ui/scoreboard.js), when they changed
+const SCORE_MS = 1000; // the scoreboard's lasers / balls dodged and boss damage (ui/scoreboard.js), when they changed
 const BD_DELAY_TICKS = 3; // boss damage reaches clients about this late
 const MATE_LEAD = 16; // ticks (0.25 s) from the ultima holder's E to the tick every copy presses it (onUse)
 const MAX_SAMPLES = 160; // per state message (2.5 s of ticks, for a tab catching up)
@@ -241,7 +241,10 @@ export class Round {
       return;
     }
     if (!p.alive) return; // the dead don't shoot
-    for (const [id, dmg, n] of p.check.checkHits(hits, mult)) this.addDamage(id, dmg, n);
+    for (const [id, dmg, n] of p.check.checkHits(hits, mult)) {
+      this.addDamage(id, dmg, n);
+      p.bossHits = (p.bossHits || 0) + n / mult; // the scoreboard's boss damage: one per landed shot (mult boss hits each)
+    }
   }
 
   // the one item player `id` holds (lib/room-rules.js itemHolders), and the teammates' items their copy runs
@@ -274,8 +277,9 @@ export class Round {
   // team = the simulated team's fire: its bullets carry the team (engine.teamEnt) as activator, not a player
   addDamage(id, dmg, n, team = false) { const k = `${id}:${dmg}:${team ? 1 : 0}`; this.dmg.set(k, (this.dmg.get(k) || 0) + n); }
 
-  // every player's lasers / balls dodged so far, by the server's copies of their runs: [[id, lasers, balls]]
-  dodged() { return [...this.players.values()].map((p) => [p.id, p.check.dodges?.dodged.laser ?? 0, p.check.dodges?.dodged.ball ?? 0]); }
+  // every player's lasers / balls dodged so far (the server's copies of their runs) and boss hits landed with a weapon
+  // (checked shots, not the simulated team's fire): [[id, lasers, balls, boss]]
+  dodged() { return [...this.players.values()].map((p) => [p.id, p.check.dodges?.dodged.laser ?? 0, p.check.dodges?.dodged.ball ?? 0, Math.round(p.bossHits || 0)]); }
   sendScore() {
     const s = this.dodged(), key = JSON.stringify(s);
     if (key !== this.scoreSent) { this.scoreSent = key; this.broadcast({ t: 'score', r: this.r, s }); }
@@ -334,7 +338,7 @@ export class Round {
     const t = this.stageTime;
     this.ended = true;
     this.result = { t: 'end', r: this.r, result, reason, at: t, winners: winners.map((p) => p.id), best: all.length > 1 ? best.map((p) => p.id) : [],
-      stats: all.map((p) => ({ id: p.id, alive: p.alive, at: p.deadAt == null ? null : Math.min(p.deadAt, t), hits: hits(p), dl: p.check.dodges?.dodged.laser ?? 0, db: p.check.dodges?.dodged.ball ?? 0, cheat: p.cheat || undefined })) };
+      stats: all.map((p) => ({ id: p.id, alive: p.alive, at: p.deadAt == null ? null : Math.min(p.deadAt, t), hits: hits(p), dl: p.check.dodges?.dodged.laser ?? 0, db: p.check.dodges?.dodged.ball ?? 0, bh: Math.round(p.bossHits || 0), cheat: p.cheat || undefined })) };
     this.broadcast(this.result);
     this.ev('round.end', { result, reason, why, at: t, sentTo: this.room.members.filter((c) => this.players.has(c.id)).length,
       players: all.map((p) => `#${p.id}:${p.alive ? 'alive' : 'dead'}:${hits(p)}h${p.cheat ? `:cheat-${p.cheat}` : ''}${p.left ? ':left' : ''}`) });

@@ -92,7 +92,6 @@ static class PanoramaBake
         "panorama/scripts/scoreboard.vts_c",
         "panorama/scripts/common/gamerules_constants.vts_c",
         "panorama/images/icons/ui/casual.vsvg_c",
-        "panorama/images/icons/ui/star.vsvg_c",
         "panorama/images/icons/ui/elimination.vsvg_c",
         "panorama/images/icons/ui/ping_4.vsvg_c",
         "panorama/images/icons/scoreboard/avatar-ct_png.vtex_c",
