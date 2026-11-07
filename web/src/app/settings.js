@@ -6,7 +6,7 @@
 // fixedHumans / humans: off = boss HP for you alone (the map's own scaling); on = for `humans` of them, the others
 //   being the simulated team (lib/room-rules.js bossHumans; app/rules.js rule('humans') is the count a run uses)
 // bossHp: % of that boss HP to actually fight through; autoFire: the other humans shoot the boss
-// sfx / music: game sound and CS2's `snd_musicvolume`, 0-1 each
+// master: CS2's `volume`, over everything (sfx, music, voice); sfx / music: game sound and CS2's `snd_musicvolume`, 0-1 each
 // thirdPerson / tpDist: CS2Fixes' third person (cs2f_thirdperson_distance_default 65, _min 15, _max 150)
 // gamma: CS2's r_fullscreen_gamma (ui/gamma.js; CS2's default is 2.2, lower = brighter); 2 here by default
 import { $ } from '../lib/dom.js';
@@ -25,6 +25,7 @@ export const DEFAULTS = {
   // the map's ultima (world/items.js: offliner's Shockwave, westersand's Holy Magick): 'none', 'hold' (yours, E; you
   // then hold nothing else) or 'auto' (a teammate sets it off ultimaAt s after the stage starts)
   ultimaItem: 'none', ultimaAt: 0,
+  master: 1, // over the three below (main.js applySettings)
   sfx: 0.5, music: 0.5,
   voice: 0.8, // teammates' voice in a room (app/voice.js), 0-1 like the other two
   perfectTeam: false, // true = the other humans never stop shooting (the old fast kill)
@@ -52,7 +53,7 @@ export const DEFAULTS = {
 // Allowed range per numeric setting; a saved value outside it is clamped (the menu can't produce one).
 export const RANGES = {
   sens: [0.001, 100], timescale: [0.01, 4], humans: [1, 64], bossHp: [1, 100], ping: [0, 500],
-  sfx: [0, 1], music: [0, 1], voice: [0, 1], tpDist: [15, 150], gamma: [1, 2.5], renderScale: [0.25, 1], pixelCap: [0.5, 3], quality: [0, 3], streamDistance: [0, 2], touchSens: [0.2, 3], ultimaAt: [0, 300],
+  master: [0, 1], sfx: [0, 1], music: [0, 1], voice: [0, 1], tpDist: [15, 150], gamma: [1, 2.5], renderScale: [0.25, 1], pixelCap: [0.5, 3], quality: [0, 3], streamDistance: [0, 2], touchSens: [0.2, 3], ultimaAt: [0, 300],
 };
 const DROPPED = new Set(['myaw', 'fov', 'stamina', 'volume']);
 // string settings: one of these values
@@ -111,7 +112,7 @@ export const settings = { ...DEFAULTS, ...sanitizeSettings(migrate(loadJson(KEY)
 
 export function saveSettings() { saveJson(KEY, settings); }
 
-const PERCENT = new Set(['sfx', 'music', 'voice']);
+const PERCENT = new Set(['master', 'sfx', 'music', 'voice']);
 
 // each bound control's redraw from `settings`: syncControls() after something else (the console) changed a setting
 const redraws = [];
@@ -154,6 +155,7 @@ export function bindSettings(onChange) {
   bind('#renderscale', 'renderScale', (v) => `${Math.round(v * 100)}%`); bind('#msaa', 'msaa');
   bind('#fog', 'fog'); bind('#reflections', 'reflections'); bind('#bakedlighting', 'bakedLighting'); bind('#quality', 'quality'); bind('#streamdistance', 'streamDistance');
   // 0-1 like CS2's console values: game sound (the menu's #volume pair, labelled SFX) and `snd_musicvolume`
+  bindPair('#mastervol', '#mastervol-num', 'master', 0, 1, onChange, 0.01);
   bindPair('#volume', '#volume-num', 'sfx', 0, 1, onChange, 0.01);
   bindPair('#musicvol', '#musicvol-num', 'music', 0, 1, onChange, 0.01);
   bindPair('#voicevol', '#voicevol-num', 'voice', 0, 1, onChange, 0.01);

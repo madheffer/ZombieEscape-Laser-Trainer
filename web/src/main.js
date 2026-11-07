@@ -172,8 +172,9 @@ function applySettings() {
   G.renderer.showHitboxes = settings.hitboxes;
   G.renderer.delay = simulatedPing() / 1000; // a round's is locked at its start (app/coop-load.js)
   if (S.engine) S.engine.humans = rule('humans');
-  G.audio.setVolumes({ sfx: settings.sfx, music: settings.music });
-  G.voice?.setVolume(settings.voice);
+  // the master volume (CS2's `volume`) scales each of them, on the same slider curve
+  G.audio.setVolumes({ sfx: settings.sfx * settings.master, music: settings.music * settings.master });
+  G.voice?.setVolume(settings.voice * settings.master);
   applyGamma(settings.gamma); // r_fullscreen_gamma (ui/gamma.js)
   G.renderer.setQuality({ renderScale: settings.renderScale, msaa: settings.msaa, pixelCap: settings.pixelCap, bloom: settings.bloom, reflections: settings.reflections });
   G.renderer.lighting.setOptions({ fog: settings.fog, reflections: settings.reflections, particleLights: settings.particleLights });

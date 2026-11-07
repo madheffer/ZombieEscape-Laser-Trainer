@@ -45,9 +45,9 @@ export function registerGame({ net, restart, openMap, leaveRun }) {
   settingCvar('sensitivity', 'sens', { help: 'Mouse sensitivity.' });
   defineCvar({ name: 'm_yaw', help: 'Mouse yaw factor.', flags: ['archive', 'readonly'], def: M_YAW, get: () => M_YAW });
   defineCvar({ name: 'm_pitch', help: 'Mouse pitch factor.', flags: ['archive', 'readonly'], def: M_YAW, get: () => M_YAW });
-  // the menu's SFX slider, by two names: CS2's master `volume`, and snd_sfxvolume beside snd_musicvolume / snd_voipvolume
-  settingCvar('volume', 'sfx', { help: 'Game sound volume (the menu\'s SFX).' });
-  settingCvar('snd_sfxvolume', 'sfx', { help: 'SFX volume (the menu\'s SFX slider; the same as volume)' });
+  // CS2's `volume` is the master, over effects, music and voice (each its own slider under it in Settings › Audio)
+  settingCvar('volume', 'master', { help: 'Master volume: scales effects, music and voice' });
+  settingCvar('snd_sfxvolume', 'sfx', { help: 'Effects volume: lasers, weapons, footsteps' });
   settingCvar('snd_musicvolume', 'music', { help: 'Music volume' });
   settingCvar('snd_voipvolume', 'voice', { help: 'Voice volume' });
   settingCvar('r_fullscreen_gamma', 'gamma', { help: 'Screen Gamma (lower is brighter; CS2\'s default is 2.2)' });
