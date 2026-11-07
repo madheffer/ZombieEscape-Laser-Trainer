@@ -7,12 +7,25 @@
 // don't get through shoves you back into the trigger_teleport that sends humans to the kill room.
 // UNSETTLED: CS2's VPhysics2 kinematic push isn't decompiled; this is Source's rule (translation and rotation by
 // the mover's own transform, no velocity given).
+// A mover that can't push you on is blocked by you, and Source's Blocked() hurts the blocker by the mover's
+// blockdamage (SDK 2013 CFuncMoveLinear / CBaseDoor::Blocked, DMG_CRUSH), every tick it stays blocked: the pusher is
+// the hierarchy's moving root (SV_Push runs on it), so a child's block takes the nearest mover up its parents with a
+// blockdamage. ze_project_codex's rising blocks crush you against the lid over the tower top, and the rising top
+// crushes you under a block (y_tower_drop_linear, c_tower_ct_up_linear: 99999).
 import { boxTouchesHull } from './collision.js';
+
+// the mover whose blockdamage a block of e deals (e or a parent), or null
+export function crusher(e) {
+  for (let m = e; m; m = m.parent) if (parseFloat(m.kv?.blockdamage) > 0) return m;
+  return null;
+}
 
 const SKIN = 0.05; // a hull just touching you (standing against a wall) isn't in you
 
-// before: Map(entity -> its world matrix at the start of the tick); solids: engine.solids() after the tick's moves
+// before: Map(entity -> its world matrix at the start of the tick); solids: engine.solids() after the tick's moves.
+// Returns the movers that couldn't push you all the way (blocked: their crusher() hurts you)
 export function pushPlayer(player, before, solids) {
+  const blocked = [];
   const ground = player.groundEntity;
   const h = player.half();
   const hs = [h[0] - SKIN, h[1] - SKIN, h[2] - SKIN];
@@ -39,7 +52,9 @@ export function pushPlayer(player, before, solids) {
     const tr = player.trace(o, target);
     world.dynamic = all;
     if (!tr.allSolid) player.origin = [tr.endPos[0], tr.endPos[1], tr.endPos[2] - player.height / 2];
+    if (tr.allSolid || tr.fraction < 1) blocked.push(e);
   }
+  return blocked;
 }
 
 // the solids' world matrices before the tick's moves (the pushPlayer `before`)

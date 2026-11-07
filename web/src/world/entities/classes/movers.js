@@ -43,8 +43,15 @@ function modelSizeAlong(e, dir) {
   return Math.abs(size[0] * dir[0]) + Math.abs(size[1] * dir[1]) + Math.abs(size[2] * dir[2]);
 }
 
+// Source 1's spawnflags 4 "Non-solid to Player" (SDK 2013 doors.cpp SF_DOOR_NONSOLID_TO_PLAYER): the door joins
+// COLLISION_GROUP_PASSABLE_DOOR, which CGameRules::ShouldCollide keeps out of player movement; physics objects still
+// hit it. ze_project_codex's tower steps ride on such doors (r_final_platform_linear) right over the rising top.
+// CS2's handling of the flag isn't checked, so a CS2 map keeps the old rule (only 8, Passable).
+const doorPassableToPlayer = (e) => e.engine.source1 && (num(e.kv.spawnflags) & 4) !== 0;
+
 register('func_door', {
-  solid: (e) => !(num(e.kv.spawnflags) & 8),
+  solid: (e) => !(num(e.kv.spawnflags) & 8) && !doorPassableToPlayer(e),
+  physSolid: (e) => !(num(e.kv.spawnflags) & 8) && doorPassableToPlayer(e),
   spawn(e) {
     const dir = moveDirs(e);
     // CS2 CBaseDoor::Spawn (cs2_server FUN_180d53f10): travel = |movedir . OBB size| - m_flLip, unclamped, and

@@ -45,6 +45,7 @@ CS2 and its workshop folder are found from Steam's library list (`node tools/ste
 | ze_surf_dark_fantasy_v2go2 | CS:GO map, from its .bsp (BAKING.md "CS:GO maps"): the Queen, "Secret - Ghosts" |
 | ze_xenovation_v3_5 | CS:GO map, from its .bsp, cropped to its endings (BAKING.md "Cropping"): the secret ending's look-up finale + climb, level 1's laser corridor, level 2's ending |
 | ze_nora_v1_11 | CS:GO map, from its .bsp (`ze_nora_v1_11.rar`, not on the workshop), cropped to its bosses: the warmup boss, level 2's boss + laser ending, level 3's tree run (level 3 and RTV); its VScripts are hand ports (`world/entities/classes/vscript-ports/nora-*.js`) |
+| ze_project_codex_v1_2_css | CS:S map, from its .bsp (`ze_project_codex_v1_2_css.bsp.bz2`), cropped to the red tower: the Codex escape (falling lasers, rising blocks, the top's lasers); its VScripts are hand ports (`vscript-ports/codex*.js`, only the ending's functions) |
 
 ## Database (runs and leaderboards)
 
@@ -715,7 +716,11 @@ Invite link and who is alive (with each player's ping). Change stage and Setting
   landings, Player.AmbientUnderWater while your eyes are under, Physics.WaterSplash where a knife swing (its reach x 1.2)
   or a bullet meets water (`app/water-sounds.js`). The co-op fly check leaves swimmers alone.
 - **Movers push you** (`world/push.js`): a solid entity that moves into you carries you with its motion (Source's pusher),
-  against the world and other solids; the one you stand on still carries you (player.ride).
+  against the world and other solids; the one you stand on still carries you (player.ride). One that can't carry you on
+  (a ceiling, a wall) is blocked by you and hurts you by its `blockdamage` (Source's Blocked(), DMG_CRUSH; the nearest
+  mover up a child's parents that has one): ze_project_codex's rising blocks and tower top (99999).
+- **Source 1 func_door "Non-solid to Player"** (spawnflags 4, SDK 2013 SF_DOOR_NONSOLID_TO_PLAYER ->
+  COLLISION_GROUP_PASSABLE_DOOR): players pass through, physics objects don't (CS2 maps keep the old rule: only 8).
 - **Vignette** (`world/tonemap.js`): a post volume's m_vignetteParams, drawn after the colour lookup with CS2's post_process
   shader maths (D_VIGNETTE); how the vpost fields fill the shader's constants is inferred (UNSETTLED, see the file).
 - **Simulated ping** (0–500 ms, slider + exact number): your movement stays predicted, the map's entities (and their

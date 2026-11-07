@@ -473,9 +473,9 @@ export class Player {
   // Carry the player with whatever they stand on when it moves (doors, movelinears, trains).
   // `before` is the ground entity's world matrix before this tick's entity think.
   ride(ent, before, after) {
-    if (!ent || !before) return;
+    if (!ent || !before) return false;
     const b = before.elements, a = after.elements;
-    if (b.every((v, i) => v === a[i])) return;
+    if (b.every((v, i) => v === a[i])) return false;
     // feet point in the mover's old local frame, then back out through its new transform
     const inv = before.clone().invert();
     const p = { x: this.origin[0], y: this.origin[1], z: this.origin[2] };
@@ -492,6 +492,9 @@ export class Player {
     // turn with it (yaw only)
     const yb = Math.atan2(b[1], b[0]), ya = Math.atan2(a[1], a[0]);
     this.yaw += ((ya - yb) * 180) / Math.PI;
+    // carried short of where the mover went (a ceiling): you block it (world/push.js crusher)
+    const want = Math.hypot(nx - p.x, ny - p.y, nz - p.z);
+    return want > 0.5 && (tr.startSolid || tr.fraction * want < want - 0.5);
   }
 
   // snap: settle onto the floor found when landing (the walk / air move); the water mode only takes the flag

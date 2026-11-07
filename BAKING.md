@@ -263,6 +263,10 @@ is a 640x240 crop of a screenshot of the tree path, not a capture.
 ## Single steps
 ze_lifeforms_v1_1: `--box 0 -17500 -15300 17500 7000 5500` (stage 4's arena, shaft, corridor and last lift: 3.2M -> 260k triangles). Its source is
 `ze_lifeforms_v1_1.bsp.bz2` (CS:S). Its card is vauff.com's map image (mapimgs/240/ze_lifeforms.jpg), rows 300-1020 scaled to 640x240.
+ze_project_codex_v1_2_css: `--box -3500 8000 -8000 3500 17000 13000` (the red tower the Codex escape runs in: world 187 MB -> 2.6 MB, 28 chunks).
+Its source is `ze_project_codex_v1_2_css.bsp.bz2` (CS:S, LZMA lumps, a recompile of BSPSource's decompile with no vrad: no
+LUMP_LIGHTING at all, so the engine draws it fullbright and the bake lights every model white, `AmbientLight.Fullbright`).
+Its card and stage thumbnails are frames of our own stages (the blocks overhead at 117 s), not the map's screenshots.
 
 For a map that's already baked, each piece can be redone on its own (`lasers-bake <mode> <workshop.vpk> <map dir>`):
 

@@ -3,6 +3,9 @@
 // at a position given as 0..255 fractions of the leaf's bounds). A point finds its leaf down the world's BSP tree and
 // takes the nearest sample; a normal n gets sum over axes of n_i^2 x the face it points at (Source's ambient cube
 // lighting). Linear light, 1 = the texture as authored. Leaves with no samples give a neutral grey.
+// A map compiled without vrad (no LUMP_LIGHTING / LUMP_LIGHTING_HDR at all: ze_project_codex_v1_2_css, recompiled from
+// BSPSource's decompile) is drawn fullbright by the engine: its faces take the white lightmap and its models full light,
+// so every cube here is white (1) and no world light is folded in.
 using System.Numerics;
 
 namespace Lasers.Bake.Source1;
@@ -15,9 +18,13 @@ sealed class AmbientLight
     readonly (Vector3[] Cube, byte X, byte Y, byte Z)[] samples;
     readonly (Vector3 Min, Vector3 Max)[] leafBounds;
 
+    // no lightmaps in the map at all: the engine's fullbright (see the top)
+    public readonly bool Fullbright;
+
     public AmbientLight(Bsp b)
     {
         bsp = b;
+        Fullbright = b.Lumps[Bsp.LumpLighting].Len == 0 && b.Lumps[Bsp.LumpLightingHdr].Len == 0;
         var hdr = b.Lumps[LeafAmbientHdr].Len > 0 && b.Lumps[LeafAmbientIndexHdr].Len > 0;
         var (io, il) = b.Lumps[hdr ? LeafAmbientIndexHdr : LeafAmbientIndex];
         var (so, sl) = b.Lumps[hdr ? LeafAmbientHdr : LeafAmbient];
@@ -118,6 +125,7 @@ sealed class AmbientLight
     // the leaf cube with the visible world lights folded in: what lights a model at p
     public Vector3[] LitCube(Vector3 p)
     {
+        if (Fullbright) return [Vector3.One, Vector3.One, Vector3.One, Vector3.One, Vector3.One, Vector3.One];
         var cube = Cube(p).ToArray();
         foreach (var l in Lights())
         {

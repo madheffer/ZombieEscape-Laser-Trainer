@@ -9,6 +9,9 @@
 // What a port may do is what the .nut does: EntFire / EntFireByHandle (engine.fire, the script entity as caller) and
 // its own variables (e.state.vs).
 import { own } from '../../../lib/storage.js';
+import codex from './vscript-ports/codex.js';
+import codexEntity from './vscript-ports/codex-entity.js';
+import codexRed from './vscript-ports/codex-red.js';
 import queen from './vscript-ports/dark-fantasy-queen.js';
 import noraBossFight from './vscript-ports/nora-boss-fight.js';
 import noraLvl2Boss from './vscript-ports/nora-lvl2-boss.js';
@@ -21,6 +24,9 @@ const PORTS = {
   'lzyorha/_mapscripts/ze_nora/lvl2_boss_control': noraLvl2Boss,
   'lzyorha/_mapscripts/ze_nora/lv3_controller': noraLv3,
   'lzyorha/_mapscripts/ze_nora/main': noraMain,
+  'lzyorha/_mapscripts/ze_project_codex/codex': codex,
+  'lzyorha/_mapscripts/ze_project_codex/entity': codexEntity,
+  'lzyorha/_mapscripts/ze_project_codex/red': codexRed,
 };
 
 // A port's `adds`: functions that grow a boss's HP once per human who touches a trigger (nora's hp_one_cal()). The

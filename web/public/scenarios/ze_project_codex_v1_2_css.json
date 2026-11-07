@@ -1,0 +1,101 @@
+{
+  "map": "ze_project_codex_v1_2_css",
+  "title": "Project Codex",
+  "engine": "css",
+  "description": "LzYoRHa's ZE map, the CS:S version (baked from its BSP). The Codex level's escape up the red tower after the credits boss: falling lasers, rising blocks, then the tower top's sweeping lasers.",
+  "scenarios": [
+    {
+      "id": "c_escape",
+      "group": "Ending",
+      "featured": true,
+      "full": true,
+      "name": "Codex escape",
+      "summary": "Look up: lasers, rising blocks, then the top",
+      "description": "The Codex level's ending (codex.nut lvl_c_end(), 20 s after the credits boss dies; the map's author tests it with setpos 0 13148 -1444). 0-97 s: a laser drops from the top of the red tower every 4 s (then 2, 1, 0.5, 0.25 s), at a random yaw in 10 degree steps (pend_laser: 100, 50 a touch). 5-69 s: the nine steps spiral up the tower, one every 8 s (red.nut r_final_platform_spawn()), while from 8 to 80 s a rotating red laser rises from the floor every 2 s (r_final_laser_1 / _2: 2000). 90 s: the floor goes and the five block sets are placed under the tower, shuffled over five heights; from 100 s they rise 8192 units with y_tower_drop_linear (512 u/s) through the tower top, under a lid (c_drop_block, 100-114.9 s): a block that pins you against it is blocked by you, and its blockdamage kills (99999). 118 s: the top rises 10,240 units back up through the blocks (c_tower_ct_up_linear, 512 u/s, blockdamage 99999: pinned under a block is death). Every set has a way through (plate holes, the free quadrants of the two cube pairs, a sidestep between rail layers), none the same as the next. 138 s: for 8 s the horizontal lasers (c_laser_1 / c_laser_3, three heights) and two vertical ones every 0.25 s (c_laser_2, at one of 33 spots) sweep the top (4000). 153 s: nuke_r burns the glass watch cage around three sides of the top (where the fallen are put, r_final_watch_teleport) and the shaft below. Win: still alive 1 s after it.",
+      "spawn": {
+        "origin": [0, 13148, -1444],
+        "yaw": 270
+      },
+      "view": {
+        "min": [-3000, 8500, -7500],
+        "max": [3000, 16500, 12500]
+      },
+      "start": [
+        { "target": "codex_script", "input": "RunScriptCode", "param": "lvl_c_end()" }
+      ],
+      "win": { "target": "nuke_r", "input": "Enable", "survive": 1 },
+      "loseTo": ["r_final_watch_teleport_dest"],
+      "hazards": {
+        "y_tower_drop_linear": "the rising blocks (crushed)",
+        "c_tower_ct_up_linear": "a block (crushed by the rising top)",
+        "pend_laser_hurt": "a falling laser",
+        "r_final_laser_1_hurt": "a red laser",
+        "r_final_laser_2_hurt": "a red laser",
+        "c_laser_1_hurt": "a top laser",
+        "c_laser_2_hurt": "a top laser",
+        "c_laser_3_hurt": "a top laser"
+      }
+    },
+    {
+      "id": "c_lasers_blocks",
+      "group": "Ending",
+      "name": "Lasers and blocks",
+      "summary": "Look up: falling lasers, then dodge the blocks",
+      "description": "The Codex escape from its start (codex.nut lvl_c_end()) until the tower top arrives at the top (138 s). 0-97 s: a laser drops from the top of the red tower every 4 s (then 2, 1, 0.5, 0.25 s) at a random yaw in 10 degree steps (pend_laser: 100, 50 a touch); the nine steps spiral up the tower, one every 8 s, and from 8 to 80 s a rotating red laser rises from the floor every 2 s (r_final_laser_1 / _2: 2000). 90 s: the floor goes and the five block sets are placed under the tower, shuffled over five heights; from 100 s they rise 8192 units through the tower top (y_tower_drop_linear, 512 u/s) under a lid (c_drop_block, 100-114.9 s): a block that pins you against it kills (blockdamage 99999). 118 s: the top rises 10,240 units back up through them (c_tower_ct_up_linear, 512 u/s, blockdamage 99999: pinned under a block is death). Every set has a way through (plate holes, the open quadrants of the cube pairs, a sidestep between rail layers). Win when the top lasers start (the first c_laser mover opens, 138 s).",
+      "spawn": {
+        "origin": [0, 13148, -1444],
+        "yaw": 270
+      },
+      "view": {
+        "min": [-3000, 8500, -7500],
+        "max": [3000, 16500, 12500]
+      },
+      "start": [
+        { "target": "codex_script", "input": "RunScriptCode", "param": "lvl_c_end()" }
+      ],
+      "win": { "target": "c_laser_*", "input": "Open" },
+      "loseTo": ["r_final_watch_teleport_dest"],
+      "hazards": {
+        "y_tower_drop_linear": "the rising blocks (crushed)",
+        "c_tower_ct_up_linear": "a block (crushed by the rising top)",
+        "pend_laser_hurt": "a falling laser",
+        "r_final_laser_1_hurt": "a red laser",
+        "r_final_laser_2_hurt": "a red laser",
+        "c_laser_1_hurt": "a top laser",
+        "c_laser_2_hurt": "a top laser",
+        "c_laser_3_hurt": "a top laser"
+      }
+    },
+    {
+      "id": "c_top_lasers",
+      "group": "Ending",
+      "name": "Top lasers",
+      "summary": "Jump, duck and strafe the sweeping lasers",
+      "description": "The Codex escape from 138 s, as the tower top reaches the top: for 8 s the horizontal lasers at three heights (c_laser_1 / c_laser_3, one a second) and two vertical lasers every 0.25 s (c_laser_2, one of 33 spots 32 units apart) sweep across it at 2000 u/s (4000). 153 s: nuke_r burns the glass watch cage around three sides of the top (where the fallen are put) and the shaft below. Win: still alive 1 s after it.",
+      "spawn": {
+        "origin": [0, 13148, 10260],
+        "yaw": 270
+      },
+      "view": {
+        "min": [-3000, 8500, -7500],
+        "max": [3000, 16500, 12500]
+      },
+      "fastForward": 138,
+      "start": [
+        { "target": "codex_script", "input": "RunScriptCode", "param": "lvl_c_end()" }
+      ],
+      "win": { "target": "nuke_r", "input": "Enable", "survive": 1 },
+      "loseTo": ["r_final_watch_teleport_dest"],
+      "hazards": {
+        "y_tower_drop_linear": "the rising blocks (crushed)",
+        "c_tower_ct_up_linear": "a block (crushed by the rising top)",
+        "pend_laser_hurt": "a falling laser",
+        "r_final_laser_1_hurt": "a red laser",
+        "r_final_laser_2_hurt": "a red laser",
+        "c_laser_1_hurt": "a top laser",
+        "c_laser_2_hurt": "a top laser",
+        "c_laser_3_hurt": "a top laser"
+      }
+    }
+  ]
+}

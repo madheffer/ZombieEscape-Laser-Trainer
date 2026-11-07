@@ -20,7 +20,7 @@ import { playerMark } from './marks.js';
 import { plural } from '../lib/format.js';
 import { cameraPosition } from './camera.js';
 import { perfFrame } from './perf.js';
-import { pushPlayer, solidMatrices } from '../world/push.js';
+import { pushPlayer, solidMatrices, crusher } from '../world/push.js';
 
 let acc = 0;
 let last = performance.now();
@@ -248,9 +248,15 @@ export function step() {
   const solidsBefore = S.replay ? null : solidMatrices(world.dynamic); // a mover that runs into you pushes you (world/push.js)
   if (mapRuns(run)) engine.tick(CS.tick); // a mid-map stage holds still through its countdown
   G.renderer.record(engine.time);
-  if (ground && !S.replay) player.ride(ground, groundBefore, ground.getWorld());
+  // a mover you block (carried into a ceiling, pushed into a wall) hurts you by its blockdamage (world/push.js crusher)
+  const blockers = [];
+  if (ground && !S.replay && player.ride(ground, groundBefore, ground.getWorld())) blockers.push(ground);
   world.dynamic = engine.solids();
-  if (solidsBefore) pushPlayer(player, solidsBefore, world.dynamic);
+  if (solidsBefore) blockers.push(...pushPlayer(player, solidsBefore, world.dynamic));
+  if (run.started && !run.done) {
+    const crushed = new Set(blockers.map(crusher).filter(Boolean));
+    for (const m of crushed) hurtPlayer(parseFloat(m.kv.blockdamage), m);
+  }
   if (S.replay) {
     // where the recorded player stood on this tick (app/replay-play.js); the recording's end is the replay's
     if (!applyPose(run.ticks, player)) { finish('end'); return; }
