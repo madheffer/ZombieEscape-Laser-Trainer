@@ -24,6 +24,7 @@ const GRACE_MIN_MS = 15_000;
 const STALL_MS = 10_000;
 const WAIT_MS = 500; // the loading roster ('wait': who is ready, everyone's progress) goes out at most this often
 const CLOCK_MS = 250, BOSS_MS = 100;
+const SCORE_MS = 1000; // the scoreboard's lasers / balls dodged (ui/scoreboard.js), when they changed
 const BD_DELAY_TICKS = 3; // boss damage reaches clients about this late
 const MATE_LEAD = 16; // ticks (0.25 s) from the ultima holder's E to the tick every copy presses it (onUse)
 const MAX_SAMPLES = 160; // per state message (2.5 s of ticks, for a tab catching up)
@@ -50,7 +51,7 @@ export class Round {
     this.waitAt = 0; this.waitDirty = false;
     this.countdown = COUNTDOWN; // a mid-map stage too: it holds still through it (world/run-engine.js)
     this.dmg = new Map();
-    this.clockAt = 0; this.bossAt = 0;
+    this.clockAt = 0; this.bossAt = 0; this.scoreAt = 0; this.scoreSent = '';
     this.ended = false;
     this.players = new Map(room.members.map((c) => [c.id, { id: c.id, name: c.name, steamId: c.user?.steamId || null, alive: true, deadAt: null, cheat: '', budget: { at: 0, n: 0 },
       load: 0, loadAt: Date.now(), readyMs: null, left: false, ping: 0 }])); // left: gone or never loaded (out, not beaten)
@@ -273,6 +274,13 @@ export class Round {
   // team = the simulated team's fire: its bullets carry the team (engine.teamEnt) as activator, not a player
   addDamage(id, dmg, n, team = false) { const k = `${id}:${dmg}:${team ? 1 : 0}`; this.dmg.set(k, (this.dmg.get(k) || 0) + n); }
 
+  // every player's lasers / balls dodged so far, by the server's copies of their runs: [[id, lasers, balls]]
+  dodged() { return [...this.players.values()].map((p) => [p.id, p.check.dodges?.dodged.laser ?? 0, p.check.dodges?.dodged.ball ?? 0]); }
+  sendScore() {
+    const s = this.dodged(), key = JSON.stringify(s);
+    if (key !== this.scoreSent) { this.scoreSent = key; this.broadcast({ t: 'score', r: this.r, s }); }
+  }
+
   // ---- every 100 ms
   tick(now) {
     if (this.ended) return;
@@ -286,6 +294,7 @@ export class Round {
       for (const p of this.players.values()) p.check.queueBossDamage(rt + BD_DELAY_TICKS, h);
     }
     if (now - this.clockAt >= CLOCK_MS) { this.clockAt = now; this.broadcast({ t: 'clock', r: this.r, at: this.elapsed }); }
+    if (now - this.scoreAt >= SCORE_MS) { this.scoreAt = now; this.sendScore(); }
     // a run that falls far behind the round (a frozen tab, or slowed down on purpose) is out
     for (const p of this.players.values()) if (p.check.behind(rt)) this.kill(p, '', p.check.stageTime, 'fell behind the round');
   }
@@ -325,7 +334,7 @@ export class Round {
     const t = this.stageTime;
     this.ended = true;
     this.result = { t: 'end', r: this.r, result, reason, at: t, winners: winners.map((p) => p.id), best: all.length > 1 ? best.map((p) => p.id) : [],
-      stats: all.map((p) => ({ id: p.id, alive: p.alive, at: p.deadAt == null ? null : Math.min(p.deadAt, t), hits: hits(p), cheat: p.cheat || undefined })) };
+      stats: all.map((p) => ({ id: p.id, alive: p.alive, at: p.deadAt == null ? null : Math.min(p.deadAt, t), hits: hits(p), dl: p.check.dodges?.dodged.laser ?? 0, db: p.check.dodges?.dodged.ball ?? 0, cheat: p.cheat || undefined })) };
     this.broadcast(this.result);
     this.ev('round.end', { result, reason, why, at: t, sentTo: this.room.members.filter((c) => this.players.has(c.id)).length,
       players: all.map((p) => `#${p.id}:${p.alive ? 'alive' : 'dead'}:${hits(p)}h${p.cheat ? `:cheat-${p.cheat}` : ''}${p.left ? ':left' : ''}`) });
@@ -345,6 +354,6 @@ export class Round {
   // the copies are done: free their engines
   free() {
     for (const p of this.players.values()) p.check.dispose?.();
-    for (const p of this.players.values()) p.check = { hits: p.check.hits, alive: false, stageTime: p.check.stageTime, behind: () => false, queueBossDamage() {}, feed() {}, checkHits: () => [] };
+    for (const p of this.players.values()) p.check = { hits: p.check.hits, dodges: p.check.dodges, alive: false, stageTime: p.check.stageTime, behind: () => false, queueBossDamage() {}, feed() {}, checkHits: () => [] };
   }
 }

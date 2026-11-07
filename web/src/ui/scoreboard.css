@@ -1,0 +1,181 @@
+/* CS2's styles/scoreboard.vcss (lasers-bake --panorama) at 1080p reference px x --u. Its sizes: .sb-main 20 px padding
+   (top / sides), rgba(0,0,0,0.88), 5 px corners, centred and 30 px low; .sb-meta 75 tall, .meta-row 860 wide with 4 px
+   padding, the first one over a 1 px #80808030 divider: the mode icon 24 px (grey), "{gamemode} | {map}" Stratum2
+   Condensed bold 22 grey 40 px in, the map clock Stratum2 Mono 18 grey on the right. Teams: .sb-team__info 80 wide
+   + 10 px, the score 80 x 80 (Stratum2 Mono bold 70, shadow 2 2 3 #00000080), name / "Alive" 20 px (the count at
+   0.2 opacity); rows .sb-row 830 (.highlight-row 770) with 1 px above and below, cells 24 tall and 50 wide on
+   #ffffff08 (status / ping / flair / avatar / name on #ffffff05), labels 18 px with 6 px sides; ping 37 wide #888;
+   status 24 (2 px in), flair 135 % of 24, avatar 24; the MVP star 16 px with its count 10 px, 8 px right. Team tints
+   color-CT #B5D4EE / color-T #EAD18A (csgostyles). Your row: rgba(0,166,255,0.07) (CT) / rgba(255,238,0,0.07) (T).
+   Dead: wash #999 over the row (Panorama's wash multiplies: 60 % brightness), no cell backgrounds; dying flashes red
+   (.sb-player-pulse-death: wash red, brightness 10) for CS2's 1 s pulse. Spectators 0.8 opacity, no cell backgrounds.
+   Not ported: the bluedots background texture (a faint dot grid stands in), the timeline, footer buttons. */
+@font-face { font-family: 'Stratum2 Condensed'; src: url('/panorama/fonts/stratum2condensed-regular.otf'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Stratum2 Condensed'; src: url('/panorama/fonts/stratum2condensed-bold.otf'); font-weight: 700; font-display: swap; }
+@font-face { font-family: 'Stratum2 Medium'; src: url('/panorama/fonts/stratum2-medium.otf'); font-display: swap; }
+@font-face { font-family: 'Stratum2 Mono'; src: url('/panorama/fonts/stratum2mono-regular.otf'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Stratum2 Mono'; src: url('/panorama/fonts/stratum2mono-bold.otf'); font-weight: 700; font-display: swap; }
+
+.scoreboard {
+  --u: calc(100vh / 1080);
+  --ct: #B5D4EE; --t: #EAD18A;
+  /* Panorama blends translucent fills in linear light; a browser blends in sRGB. Over the near-black panel, CS2's
+     cell-background-dark #ffffff05 / -light #ffffff08 / -lighter #FFFFFF10 and your row's 0.07 come out as these
+     sRGB alphas (srgb(a): 0.0196 -> 0.15, 0.031 -> 0.19, 0.063 -> 0.28, 0.07 -> 0.29) */
+  --cell-dark: rgba(255, 255, 255, 0.15); --cell-light: rgba(255, 255, 255, 0.19); --cell-lighter: rgba(255, 255, 255, 0.28);
+  --you-alpha: 0.29;
+  /* over the HUD, the kill feed and the chat; under the menu (30) */
+  position: fixed; inset: 0; z-index: 29; pointer-events: none;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Stratum2', 'Arial Unicode MS', sans-serif; color: #ccc;
+}
+.scoreboard[hidden] { display: none; }
+.scoreboard .sb-main {
+  position: relative; top: calc(30 * var(--u));
+  min-width: calc(600 * var(--u));
+  padding: calc(20 * var(--u)) calc(20 * var(--u)) 0;
+  display: flex; flex-direction: column;
+  background-color: rgba(0, 0, 0, 0.88);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1.5px);
+  background-size: calc(6 * var(--u)) calc(6 * var(--u));
+  border-radius: calc(5 * var(--u));
+}
+
+/* meta */
+.scoreboard .sb-meta { height: calc(75 * var(--u)); width: 100%; }
+.scoreboard .meta-row {
+  width: calc(860 * var(--u)); min-height: calc(24 * var(--u)); box-sizing: content-box;
+  padding: calc(4 * var(--u)) 0; display: flex; align-items: center; position: relative;
+}
+.scoreboard .bottom-divider { border-bottom: 1px solid #80808030; }
+.scoreboard .sb-meta__mode-image {
+  width: calc(24 * var(--u)); height: calc(24 * var(--u)); margin: 0 calc(18 * var(--u)) 0 calc(6 * var(--u)); flex: none;
+  background: grey; /* wash-color: grey */
+  -webkit-mask: url('/panorama/icons/ui/casual.svg') center / contain no-repeat; mask: url('/panorama/icons/ui/casual.svg') center / contain no-repeat;
+}
+.scoreboard .sb-meta__mode-map {
+  font-family: 'Stratum2 Condensed', 'Arial Unicode MS', sans-serif; font-weight: 700;
+  font-size: calc(22 * var(--u)); color: grey; max-width: calc(550 * var(--u));
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.scoreboard .sb-meta__time {
+  margin-left: auto; font-family: 'Stratum2 Mono', 'Arial Unicode MS', monospace; font-size: calc(18 * var(--u)); color: grey;
+  align-self: flex-end;
+}
+
+/* the labels row: right-aligned over the rows, an 80 px spacer standing in for the team info */
+.scoreboard .sb-label-container { display: flex; flex-direction: row-reverse; align-self: flex-end; }
+.scoreboard .sb-label-spacer { width: calc(80 * var(--u)); }
+.scoreboard .sb-row--labels .sb-row__cell { background: transparent; }
+.scoreboard .sb-row--labels .sb-row__cell span {
+  font-family: 'Stratum2 Condensed', 'Arial Unicode MS', sans-serif; font-weight: 400;
+  font-size: calc(18 * var(--u)); margin: calc(5 * var(--u)) calc(2 * var(--u)) 0; color: #ccc;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.scoreboard .sb-ping-icon {
+  width: calc(20 * var(--u)); height: calc(20 * var(--u)); background: #ccc;
+  -webkit-mask: url('/panorama/icons/ui/ping_4.svg') center / contain no-repeat; mask: url('/panorama/icons/ui/ping_4.svg') center / contain no-repeat;
+}
+
+/* teams: flow-children left, so the info panel is on the left and the table on the right */
+.scoreboard .sb-team { display: flex; flex-direction: row-reverse; justify-content: flex-end; }
+.scoreboard .sb-team__info { width: calc(80 * var(--u)); margin-right: calc(10 * var(--u)); display: flex; flex-direction: column; flex: none; }
+.scoreboard .sb-color--CT { color: var(--ct); }
+.scoreboard .sb-color--TERRORIST { color: var(--t); }
+.scoreboard .sb-team__info__score {
+  width: calc(80 * var(--u)); height: calc(80 * var(--u)); display: flex; align-items: center; justify-content: center;
+  background-position: center; background-size: contain; background-repeat: no-repeat; position: relative;
+}
+/* the team's logo behind the score (sb-team-logo-bg: background-img-opacity 0.2) */
+.scoreboard .sb-team__info__score::before {
+  content: ''; position: absolute; inset: 0; opacity: 0.2; background: currentColor;
+  -webkit-mask: var(--logo) center / contain no-repeat; mask: var(--logo) center / contain no-repeat;
+}
+.scoreboard .sb-team--CT .sb-team__info__score { --logo: url('/panorama/icons/ui/ct_logo_1c.svg'); }
+.scoreboard .sb-team--TERRORIST .sb-team__info__score { --logo: url('/panorama/icons/ui/t_logo_1c.svg'); }
+.scoreboard .sb-team__info__score span {
+  position: relative; font-family: 'Stratum2 Mono', 'Arial Unicode MS', monospace; font-weight: 700;
+  font-size: calc(70 * var(--u)); line-height: 1; text-shadow: calc(2 * var(--u)) calc(2 * var(--u)) calc(3 * var(--u)) #00000080;
+}
+.scoreboard .sb-team__info__name, .scoreboard .sb-team__info__number {
+  font-family: 'Stratum2 Condensed', 'Arial Unicode MS', sans-serif; font-size: calc(20 * var(--u));
+  margin-top: calc(2 * var(--u)); text-align: center; text-shadow: 1px 1px 1px #000; max-width: calc(90 * var(--u));
+  white-space: nowrap; align-self: center;
+}
+.scoreboard .sb-team__info__number { opacity: 0.2; }
+.scoreboard .sb-players-table { display: flex; flex-direction: column; min-height: calc(120 * var(--u)); }
+.scoreboard .sb-players-table--Spectator { min-height: 0; margin-bottom: calc(20 * var(--u)); }
+.scoreboard .sb-team--Spectator { opacity: 0.8; padding-top: calc(20 * var(--u)); }
+.scoreboard .sb-timeline { min-height: calc(20 * var(--u)); margin: calc(2 * var(--u)) 0; }
+.scoreboard .sb-footer-panel { height: calc(48 * var(--u)); }
+
+/* rows */
+.scoreboard .sb-row { width: calc(830 * var(--u)); margin: 1px 0; display: flex; }
+.scoreboard .highlight-row { width: calc(770 * var(--u)); display: flex; }
+.scoreboard .sb-row--localplayer.sb-team--CT .highlight-row { background-color: rgba(0, 166, 255, var(--you-alpha)); }
+.scoreboard .sb-row--localplayer.sb-team--TERRORIST .highlight-row { background-color: rgba(255, 238, 0, var(--you-alpha)); }
+.scoreboard .sb-row__cell {
+  height: calc(24 * var(--u)); width: calc(50 * var(--u)); flex: none; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center; background-color: var(--cell-light);
+}
+.scoreboard .sb-row__cell span {
+  font-family: 'Stratum2 Mono', 'Arial Unicode MS', monospace; font-size: calc(18 * var(--u));
+  margin: 0 calc(6 * var(--u)); text-align: center; white-space: nowrap;
+}
+.scoreboard .sb-row__cell--status, .scoreboard .sb-row__cell--ping, .scoreboard .sb-row__cell--flair,
+.scoreboard .sb-row__cell--avatar, .scoreboard .sb-row__cell--name { background-color: var(--cell-dark); }
+.scoreboard .sb-row__cell--status { width: calc(24 * var(--u)); padding: calc(2 * var(--u)); }
+.scoreboard .sb-row__cell--ping { width: calc(37 * var(--u)); }
+.scoreboard .sb-row__cell--ping span { color: #888; margin: 0; }
+.scoreboard .sb-row__cell--flair { width: calc(32.4 * var(--u)); }
+.scoreboard .sb-row__cell--avatar { width: calc(24 * var(--u)); }
+.scoreboard .sb-row__cell--name { flex: 1 1 auto; width: auto; min-width: 0; padding: 0 calc(6 * var(--u)); justify-content: flex-start; }
+.scoreboard .sb-row__cell--name span {
+  font-family: 'Stratum2 Medium', 'Arial Unicode MS', sans-serif; margin: 0; text-align: left;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.scoreboard .sb-row__cell--mvps { position: relative; }
+.scoreboard .sb-avatar { width: 100%; height: 100%; background: center / cover no-repeat; }
+.scoreboard .sb-avatar--CT { background-image: url('/panorama/icons/scoreboard/avatar-ct.png'); }
+.scoreboard .sb-avatar--TERRORIST { background-image: url('/panorama/icons/scoreboard/avatar-terrorist.png'); }
+.scoreboard .sb-spec { font-family: 'Stratum2 Mono', 'Arial Unicode MS', monospace; font-size: calc(12 * var(--u)) !important; }
+
+/* team tint: names, stats, the X and the star */
+.scoreboard .sb-team--CT span.sb-team-tint { color: var(--ct); }
+.scoreboard .sb-team--TERRORIST span.sb-team-tint { color: var(--t); }
+.scoreboard .sb-team--CT div.sb-team-tint { background-color: var(--ct); }
+.scoreboard .sb-team--TERRORIST div.sb-team-tint { background-color: var(--t); }
+.scoreboard .sb-status-image {
+  width: 100%; height: 100%;
+  -webkit-mask: url('/panorama/icons/ui/elimination.svg') center / contain no-repeat; mask: url('/panorama/icons/ui/elimination.svg') center / contain no-repeat;
+}
+.scoreboard .sb-row__cell--mvps__star {
+  width: calc(16 * var(--u)); height: calc(16 * var(--u));
+  -webkit-mask: url('/panorama/icons/ui/star.svg') center / contain no-repeat; mask: url('/panorama/icons/ui/star.svg') center / contain no-repeat;
+}
+.scoreboard span.sb-row__cell--mvps__count {
+  position: absolute; top: 0; left: 50%; font-size: calc(10 * var(--u)); margin: 0;
+  transform: translateX(calc(4 * var(--u)));
+  line-height: 1;
+}
+
+/* dead (CS2: wash #999 over the row, cells without backgrounds) and the death flash */
+.scoreboard .sb-player-status-dead .highlight-row { filter: brightness(0.6); }
+.scoreboard .sb-player-status-dead .sb-row__cell,
+.scoreboard .sb-team--Spectator .sb-row__cell { background-color: transparent; }
+.scoreboard .sb-player-status-dead.sb-row--localplayer .highlight-row { background-color: transparent; }
+.scoreboard .highlight-row.sb-player-pulse-death { animation: sb-death 1s ease-out; }
+@keyframes sb-death {
+  0% { filter: sepia(1) saturate(8) hue-rotate(-50deg) brightness(3); }
+  /* the same function list at both ends, so it fades (a different list would flip halfway) */
+  100% { filter: sepia(0) saturate(1) hue-rotate(0deg) brightness(0.6); }
+}
+
+/* column shading (cell-background-dark #ffffff05 / -light #ffffff08 / -lighter #FFFFFF10): every second stat column
+   dark, the sort column (score) lighter with its text at brightness 2; dead rows and the labels row keep no cell
+   backgrounds, as CS2's :not(.eom-scoreboard) rule (its labels' text still brightens) */
+.scoreboard .sb-row__cell--dark { background-color: var(--cell-dark); }
+.scoreboard .sb-row__cell.sortstat { background-color: var(--cell-lighter); }
+.scoreboard .sortstat span { filter: brightness(2); }
+.scoreboard .sb-row--labels .sb-row__cell,
+.scoreboard .sb-player-status-dead .sb-row__cell { background-color: transparent; }

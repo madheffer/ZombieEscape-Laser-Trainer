@@ -14,6 +14,7 @@
 // Violations are counted per kind; a few within two seconds and the player is out of the round.
 import { createRunEngine, hazardName, TICK, COUNTDOWN, startIfDue, mapRuns, winDue, sentOut, pressMateUses, queueMateUse } from '../src/world/run-engine.js';
 import { caughtBy } from '../src/world/caught.js';
+import { DodgeTracker } from '../src/world/dodges.js';
 import { useItems } from '../src/world/items.js';
 import { CollisionWorld, makeTrace } from '../src/world/collision.js';
 import { bulletWorld, BULLET_MASK } from '../src/world/bullets.js';
@@ -69,6 +70,9 @@ export class PlayerCheck {
     this.gravity = scenario?.player?.gravity ?? 1;
     this.noFall = false;
     this.alive = true; this.hits = 0; this.ticks = 0; this.t = 0;
+    // what came at this player and what they got past (world/dodges.js): the scoreboard's lasers / balls dodged, counted
+    // on the server's copy so nobody can claim more than they dodged
+    this.dodges = new DodgeTracker((src) => hazardName(src, scenario));
     this.boost = 0; this.boostSpeed = 0; this.skipMove = false; this.expectAt = null;
     this.strikes = new Map(); this.flagged = '';
     this.vz = 0; this.air = []; this.wasAir = false;
@@ -202,7 +206,9 @@ export class PlayerCheck {
     this.checkMove(pos, ducked);
     this.pos = pos; this.ducked = ducked;
     if (!this.alive) return;
-    for (const ev of engine.updateTriggers(this.stub)) {
+    const events = engine.updateTriggers(this.stub);
+    this.dodges.observe(engine, this.stub, events, run.started);
+    for (const ev of events) {
       if (ev.type === 'hurt' && run.started) {
         if (ev.first) this.hits++;
         if (!this.rules.god) { this.hp -= ev.damage; if (this.hp <= 0) return this.die(hazardName(ev.ent, this.scenario)); }

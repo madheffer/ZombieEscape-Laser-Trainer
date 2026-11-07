@@ -23,7 +23,7 @@ import { consoleSay } from './chat.js';
 import { simulatedPing } from './coop-load.js';
 import { waterQuery } from '../world/water-volumes.js';
 import { waterSound } from './water-sounds.js';
-import { DodgeTracker } from './dodges.js';
+import { DodgeTracker } from '../world/dodges.js';
 import { reportRun } from './console/run-report.js';
 import { con } from './console/output.js';
 

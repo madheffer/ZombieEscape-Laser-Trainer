@@ -86,6 +86,17 @@ static class PanoramaBake
         "panorama/images/icons/ui/sound_2.vsvg_c",
         "panorama/images/icons/ui/sound_3.vsvg_c",
         "panorama/images/icons/ui/kill.vsvg_c",
+        // the scoreboard (ui/scoreboard.js, Tab in a co-op round): its layout, style, script and the team avatars
+        "panorama/layout/scoreboard.vxml_c",
+        "panorama/styles/scoreboard.vcss_c",
+        "panorama/scripts/scoreboard.vts_c",
+        "panorama/scripts/common/gamerules_constants.vts_c",
+        "panorama/images/icons/ui/casual.vsvg_c",
+        "panorama/images/icons/ui/star.vsvg_c",
+        "panorama/images/icons/ui/elimination.vsvg_c",
+        "panorama/images/icons/ui/ping_4.vsvg_c",
+        "panorama/images/icons/scoreboard/avatar-ct_png.vtex_c",
+        "panorama/images/icons/scoreboard/avatar-terrorist_png.vtex_c",
         // the console (ui/console.js): its window, log, entry and completion list
         "panorama/styles/gameconsole.vcss_c",
     ];
@@ -125,7 +136,7 @@ static class PanoramaBake
                 var rel = path["panorama/".Length..];
                 if (rel.StartsWith("images/", StringComparison.Ordinal)) rel = rel["images/".Length..];
                 rel = rel[..^2]; // drop _c
-                rel = rel.Replace(".vsvg", ".svg").Replace(".vxml", ".xml").Replace(".vcss", ".css");
+                rel = rel.Replace(".vsvg", ".svg").Replace(".vxml", ".xml").Replace(".vcss", ".css").Replace(".vts", ".ts");
                 File.WriteAllBytes(SafePath.OutFile(outDir, rel), content.Data);
                 ok++;
             }

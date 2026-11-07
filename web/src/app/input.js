@@ -267,6 +267,7 @@ export function installInput(canvas, actions) {
       case 'KeyF': G.vm.inspect(); break;
       case 'KeyE': useItems(); break; // CS2 +use: the held map item's button (app/items.js)
       case 'KeyV': actions.talk?.(true); break; // +voicerecord, held
+      case 'Tab': G.scoreboard?.show(true); break; // +showscores, held (a tap flashes it): co-op rooms only (ui/scoreboard.js)
       case 'Backspace': actions.restart(); break;
       // a co-op / versus round plays by the room's rules (app/rules.js): these are solo-only
       case 'KeyH': if (!S.mp) { setToggle('hitboxes', '#hitboxes', !settings.hitboxes); actions.applySettings(); } break;
@@ -274,6 +275,6 @@ export function installInput(canvas, actions) {
       case 'KeyT': if (!S.mp) settings.timescale = settings.timescale === 1 ? 0.25 : 1; break;
     }
   });
-  document.addEventListener('keyup', (ev) => { keys.delete(ev.code); if (ev.code === 'KeyV') actions.talk?.(false); });
-  window.addEventListener('blur', () => { keys.clear(); actions.talk?.(false); });
+  document.addEventListener('keyup', (ev) => { keys.delete(ev.code); if (ev.code === 'KeyV') actions.talk?.(false); if (ev.code === 'Tab') G.scoreboard?.show(false); });
+  window.addEventListener('blur', () => { keys.clear(); actions.talk?.(false); G.scoreboard?.show(false); });
 }

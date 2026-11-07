@@ -8,7 +8,7 @@
 //   as it is long is a ball, anything else a hazard.
 // Damage taken is kept per hazard, by its name in words (world/run-engine.js hazardName), with fall damage as its own.
 // env_laser beams and point_hurt (classes/beams.js) aren't volumes: their damage counts, a near miss doesn't.
-import { boxTouchesHull } from '../world/collision.js';
+import { boxTouchesHull } from './collision.js';
 
 const NEAR = 64; // units between your hull and the hazard's that count as "it came at you"
 const LASER_NAME = /laser|beam/;
@@ -30,7 +30,7 @@ export class DodgeTracker {
   // one tick: engine.updateTriggers' events (already returned); live = the stage clock runs and the run isn't over
   observe(engine, player, events, live) {
     if (!live) { this.passes.clear(); return; }
-    this.topSpeed = Math.max(this.topSpeed, Math.hypot(player.velocity[0], player.velocity[1]));
+    if (player.velocity) this.topSpeed = Math.max(this.topSpeed, Math.hypot(player.velocity[0], player.velocity[1])); // the server's copy has none
     const hurtBy = new Set();
     for (const ev of events) {
       if (ev.type !== 'hurt') continue;

@@ -11,12 +11,16 @@
 import { cleanSettings, cleanText } from '../lib/room-rules.js';
 import { cleanChat, cleanChatName } from '../lib/chat-colors.js';
 import { isMapName } from '../lib/paths.js';
+import { emptyTally } from '../lib/laser-score.js';
 
 export const ROOM_CODE = /^[A-Z]{4}$/;
 const RTT_MS = 2000;
 const VOICE_MAX = 600; // bytes per packet (server/coop-voice.js)
 const VOICE_BACKLOG = 16 * 1024; // bytes still queued on the socket past which a packet is dropped, not sent late
-const GAME = new Set(['start', 's', 'dead', 'bd', 'clock', 'leader', 'end', 'use', 'wait', 'go']);
+const GAME = new Set(['start', 's', 'dead', 'bd', 'clock', 'leader', 'end', 'use', 'wait', 'go', 'score']);
+// a count from the server (the scoreboard's totals: server/coop-tally.js)
+const count = (v) => (Number.isInteger(v) && v >= 0 ? Math.min(v, 1e7) : 0);
+const cleanTally = (t) => { const o = emptyTally(); if (t && typeof t === 'object') for (const k in o) o[k] = count(t[k]); return o; };
 
 export class CoopClient {
   constructor() {
@@ -132,7 +136,7 @@ export class CoopClient {
       case 'room': {
         if (!ROOM_CODE.test(m.code) || !Array.isArray(m.members)) return;
         const members = m.members.filter((x) => Number.isInteger(x?.id)).slice(0, 8).map((x) => ({
-          id: x.id, name: cleanText(x.name, 24) || 'Player', ping: Number.isInteger(x.ping) ? Math.max(0, Math.min(500, x.ping)) : 0 }));
+          id: x.id, name: cleanText(x.name, 24) || 'Player', ping: Number.isInteger(x.ping) ? Math.max(0, Math.min(500, x.ping)) : 0, tally: cleanTally(x.tally) }));
         const round = m.round && Number.isInteger(m.round.r)
           ? { r: m.round.r, stage: cleanText(m.round.stage, 60), ids: Array.isArray(m.round.ids) ? m.round.ids.filter(Number.isInteger) : [] } : null;
         const prev = this.room;
@@ -140,7 +144,8 @@ export class CoopClient {
         // next: the owner's pick for the next round (the room screen): { map, stage, stageName, mode, endless } or null
         const n = m.next && typeof m.next === 'object' && isMapName(m.next.map) ? m.next : null;
         const next = n ? { map: n.map, stage: typeof n.stage === 'string' ? cleanText(n.stage, 80) : null, stageName: cleanText(n.stageName, 60) || 'Free roam', mode: n.mode === 'endless' ? 'endless' : 'normal', endless: n.endless === true } : null;
-        this.room = { code: m.code, owner: m.owner | 0, you: this.you, members, settings: cleanSettings(m.settings, members.length), map: isMapName(m.map) ? m.map : '', next, round };
+        this.room = { code: m.code, owner: m.owner | 0, you: this.you, members, settings: cleanSettings(m.settings, members.length), map: isMapName(m.map) ? m.map : '', next, round,
+          score: { humans: count(m.score?.humans), zombies: count(m.score?.zombies) } };
         this.emit('room', this.room, prev);
         break;
       }

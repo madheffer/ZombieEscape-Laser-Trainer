@@ -1,4 +1,4 @@
-// The end of a run, printed to the console: how it went, what you dodged (app/dodges.js), what hurt you and how
+// The end of a run, printed to the console: how it went, what you dodged (world/dodges.js), what hurt you and how
 // much, your shooting. Solo at the end card (session.js finish); in a round when you go down, else at the round's end.
 //
 //   reportRun(run, { result, scenario, map, time, cause })   result 'win' | 'dead' | 'lose' | 'quit' | 'over'

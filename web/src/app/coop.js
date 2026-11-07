@@ -58,7 +58,7 @@ class Round {
     this.peerItems = new Map();
     for (const id of d.holders) if (id !== net.you && this.kit.heal) this.peerItems.set(id, [{ ...this.kit.heal, uses: 0, readyAt: 0 }]);
     if (d.ultima != null && d.ultima !== net.you && this.kit.ultima) this.peerItems.set(d.ultima, [{ ...this.kit.ultima, uses: 0, readyAt: 0 }]);
-    this.players = new Map(d.roster.map((m) => [m.id, { id: m.id, name: m.name, alive: true, deadAt: null, hits: 0 }]));
+    this.players = new Map(d.roster.map((m) => [m.id, { id: m.id, name: m.name, alive: true, deadAt: null, diedWall: 0, hits: 0, lasers: 0, balls: 0 }]));
     this.me = net.you;
     this.ended = false;
     this.sendAt = 0; this.bossAt = 0;
@@ -67,6 +67,8 @@ class Round {
     this.specId = null;
     this.lastAliveSaid = false;
     this.readyIds = new Set(); // who has loaded the stage (the server's 'wait'), until its 'go'
+    // everyone's room totals as the round started (server/coop-tally.js): the scoreboard adds this round to them
+    this.tallyBase = new Map((net.room?.members || []).map((m) => [m.id, { ...m.tally }]));
   }
 
   get isHost() { return net.isHost; } // the room owner (Play again on the end card)
@@ -182,7 +184,7 @@ class Round {
   markDead(id, cause, t, note) {
     const p = this.players.get(id);
     if (!p || !p.alive || this.ended) return;
-    p.alive = false; p.deadAt = t;
+    p.alive = false; p.deadAt = t; p.diedWall = performance.now(); // the scoreboard's death flash and move (ui/scoreboard.js)
     G.peers.setAlive(id, false);
     const self = id === this.me;
     if (self && S.run && !S.run.spectating) { S.run.spectating = true; S.run.deadAt = t; }
@@ -336,6 +338,14 @@ function onGame(d, at = performance.now()) {
       break;
     case 'dead': if (Number.isInteger(d.id)) mp.markDead(d.id, cleanText(d.by, 40) || 'the map', num(d.at, 0, 1e6) ? d.at : stageTime(), cleanText(d.note, 30)); break;
     case 'bd': if (!mp.ended) applyHits(d.h); break;
+    // everyone's lasers / balls dodged so far, by the server's copies of the runs (the scoreboard: ui/scoreboard.js)
+    case 'score':
+      if (!Array.isArray(d.s)) break;
+      for (const e of d.s.slice(0, 8)) {
+        const p = Array.isArray(e) && mp.players.get(e[0]);
+        if (p && num(e[1], 0, 1e6) && num(e[2], 0, 1e6)) { p.lasers = e[1] | 0; p.balls = e[2] | 0; }
+      }
+      break;
     case 'leader': if (Number.isInteger(d.id)) mp.leader = d.id; break;
     case 'use':
       if (!Number.isInteger(d.id) || mp.ended) break;

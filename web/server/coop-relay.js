@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { cleanName, cleanSettings, cheatsOn, ROOM_MAX } from '../src/lib/room-rules.js';
 import { isMapName } from '../src/lib/paths.js';
 import { Round } from './coop-round.js';
+import { tallyRound, tallyOf, forget } from './coop-tally.js';
 import { scenarioStore } from './scenarios.js';
 import { mapStore } from './map-store.js';
 import { activityFeed } from './activity.js';
@@ -113,7 +114,8 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
 
   const roomView = (room) => ({
     code: room.code, owner: room.owner, settings: room.settings, map: room.map, next: room.next || null,
-    members: room.members.map((m) => ({ id: m.id, name: m.name, ping: m.ping || 0 })),
+    members: room.members.map((m) => ({ id: m.id, name: m.name, ping: m.ping || 0, tally: tallyOf(room, m.id) })),
+    score: room.score || { humans: 0, zombies: 0 }, // the scoreboard's team score (coop-tally.js)
     round: room.round && !room.round.ended ? { r: room.round.r, stage: room.round.stage.name, ids: [...room.round.players.keys()] } : null,
   });
   const announce = (room) => { const v = roomView(room); for (const m of room.members) send(m, { t: 'room', you: m.id, ...v }); };
@@ -123,6 +125,7 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
     if (!room) return;
     c.room = null;
     room.members = room.members.filter((m) => m !== c);
+    forget(room, c.id);
     room.round?.onLeave(c);
     const wasOwner = room.owner === c.id;
     ev('leave', { room: room.code, ...who(c), why, inRound: room.round && !room.round.ended ? room.round.r : undefined, left: room.members.length });
@@ -334,6 +337,8 @@ export function attachCoopRelay(httpServer, { log = () => {}, store = openStore(
     for (const r of rooms.values()) {
       r.round?.tick(now);
       if (r.round?.ended && !r.round.fed) { r.round.fed = true; feed.round(r, r.round); }
+      // the round's numbers into the room's scoreboard totals, once, and out to everyone in the room
+      if (r.round?.ended && !r.round.tallied) { r.round.tallied = true; if (tallyRound(r, r.round)) announce(r); }
     }
     feed.tick(now);
   }, 100);

@@ -495,6 +495,12 @@ Invite link and who is alive (with each player's ping). Change stage and Setting
   a map death is `name [skull] name`, no cause; leaving is the disconnect icon; the server's why goes to chat), and you
   can still clear the stage alone as the last one alive. Everyone dead = team wiped (endless: whoever lasted
   longest). Dead players spectate a teammate (Mouse 1 = next).
+- **Scoreboard** (hold Tab in a room, a tap flashes it: CS2's +showscores): CS2's casual board from its own
+  scoreboard.vxml / .vcss (`--panorama`), "Casual | <map>", the map clock, Humans / Zombies with the room's round score
+  (stage cleared / lost), spectators under them. A row: elimination X when dead, ping, a badge slot (achievements, not
+  in yet), avatar, name, then ours: Lasers, Balls (dodged, counted on the server's copy of each run), Wins, Losses,
+  MVPs, Score (`lib/laser-score.js`: 1 a dodge, 10 a win, 5 an MVP), room totals kept by `server/coop-tally.js`. A
+  player who dies flashes red, dims, and slides to the Zombies after CS2Fixes' `zr_respawn_delay` (5 s).
 - **Versus**: the same stage side by side, last one alive wins. If both clear it, fewer hits wins.
 
 **The server runs the rooms and the rounds** (`web/server/`), not a player:

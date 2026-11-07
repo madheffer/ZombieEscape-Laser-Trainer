@@ -39,6 +39,8 @@ import { MapPicker } from './ui/maps.js';
 import { Radar } from './ui/radar.js';
 import { ItemHud } from './ui/itemhud.js';
 import { Killfeed } from './ui/killfeed.js';
+import { Scoreboard } from './ui/scoreboard.js';
+import { scoreboardData } from './app/scoreboard-data.js';
 import { installChat } from './app/chat.js';
 import { installVoice, talk } from './app/voice.js';
 import { installConsole } from './app/console/index.js';
@@ -93,6 +95,7 @@ function leaveLoading() {
   G.menu.update();
 }
 G.killfeed = new Killfeed($('#killfeed'));
+G.scoreboard = new Scoreboard(document.body, () => scoreboardData()); // Tab in a co-op room (app/input.js)
 installChat($('#chat'), { net }); // Y / U to talk (app/chat.js)
 installVoice(); // V to talk out loud (app/voice.js)
 G.peers = new Peers(G.renderer.scene, { log, onModel: litByParticles }); // the other players in a co-op / versus round
