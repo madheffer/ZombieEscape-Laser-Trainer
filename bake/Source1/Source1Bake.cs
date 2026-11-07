@@ -142,7 +142,11 @@ static class Source1Bake
         if (mats.Missing.Count > 30) Log($"  ... {mats.Missing.Count - 30} more missing");
 
         // 5. sky/: worldspawn's skyname, the 2D skybox's six faces (materials/skybox/<name><rt|bk|lf|ft|up|dn>)
-        var sky = WriteSky(ents.FirstOrDefault(e => e.Get("classname") == "worldspawn")?.Get("skyname"), files, mats, outDir);
+        //    A sky the game can't load falls back to sky_urb01, as CS:GO's engine.dll does ("Unable to load sky %s, but
+        //    successfully loaded %s", beside "sky_urb01"). ze_luciddreams_b5 names proxy_sky_cubemap, which it doesn't ship,
+        //    and CS:GO's pak01 has no sky_urb01 either: no sky2d then (UNSETTLED: what the engine draws with neither)
+        var sky = WriteSky(ents.FirstOrDefault(e => e.Get("classname") == "worldspawn")?.Get("skyname"), files, mats, outDir)
+            ?? WriteSky(FallbackSky, files, mats, outDir);
         //    + every skybox_swapper's SkyboxName (its Trigger input makes it the 2D sky): sky/<name>/
         var skySets = new JsonObject();
         foreach (var e in ents.Where(e => string.Equals(e.Get("classname"), "skybox_swapper", StringComparison.OrdinalIgnoreCase)))
@@ -209,6 +213,8 @@ static class Source1Bake
     // -> { "rt": "sky/rt.png", ... } for the faces found (null without a sky). The face's own material names its
     // texture ($basetexture), as Source's sky drawing loads skybox/<name><face>; the _hdr variant is not used
     // own: a skybox_swapper's sky, in its own folder (sky/<name>/) beside worldspawn's
+    const string FallbackSky = "sky_urb01"; // CS:GO engine.dll's sky when the map's can't be loaded
+
     static JsonObject? WriteSky(string? name, GameFiles files, Materials mats, string outDir, bool own = false)
     {
         if (string.IsNullOrWhiteSpace(name)) return null;

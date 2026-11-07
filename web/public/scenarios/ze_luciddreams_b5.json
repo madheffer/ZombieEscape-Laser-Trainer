@@ -1,0 +1,155 @@
+{
+  "map": "ze_luciddreams_b5",
+  "title": "ze_luciddreams_b5",
+  "engine": "csgo",
+  "description": "A CS:GO map (Source 1, baked from its BSP): level 1's ending. Look up and dodge the falling balls, then shoot the boss through its blades and dodge the lasers across the platform behind it.",
+  "scenarios": [
+    {
+      "id": "balls",
+      "group": "Ending",
+      "name": "Falling balls",
+      "summary": "Look up: dodge the balls falling on you",
+      "description": "minigames_balls (the elevator room, enabled by st1_d_2's break; practice / black mode send you straight here) runs the minigame from your first touch. At +15 s timer_balls starts: every 0.11 s the four maker_balls (parented to door_balls_rot1-4, which swing 470 u/s back and forth on balls_rot_final, 3800 units up) drop a temp_balls ball, a func_movelinear going down 4300 units at 3100 u/s with a 96-unit hurt_balls (99999) on it. From +20 s timer_final_balls reverses the spinner every 0.6-1 s and from +22 s timer_final_balls3 sets the balls' speed (2200-2800, the last output: 2500) and spins it backward. The timers die at +57 s; at +59 s LV1_TOGGLE_WALL breaks and LV1_END_BRIDGE appears, and at +60 s LV1_balls_elevator lifts you (200 u/s) to the boss corridor: the win. Falling off the elevator is the 99999 hurt below.",
+      "spawn": {
+        "origin": [
+          -13000,
+          219,
+          11100
+        ],
+        "yaw": 90
+      },
+      "view": {
+        "min": [
+          -14400,
+          -1200,
+          10500
+        ],
+        "max": [
+          -11600,
+          2200,
+          15600
+        ]
+      },
+      "start": [
+        {
+          "target": "minigames_balls",
+          "input": "Enable"
+        }
+      ],
+      "music": [
+        {
+          "target": "lv1_music_2",
+          "input": "PlaySound"
+        }
+      ],
+      "player": {
+        "health": 100
+      },
+      "win": {
+        "target": "LV1_balls_elevator",
+        "input": "Open"
+      },
+      "hazards": {
+        "hurt_balls": "a falling ball"
+      }
+    },
+    {
+      "id": "boss",
+      "group": "Ending",
+      "featured": true,
+      "name": "Boss + lasers",
+      "summary": "Shoot the boss, then dodge the lasers behind it",
+      "description": "From lv1_end_trigger (the boss corridor after the balls elevator, 50 s into its 56-second hold): Color3 (blackwhite) fades in over 50 s, color4 (whiteBB) 10 s later, and LEVEL1 _ END_MUSIC plays. At 56 s LV1_END_DOOR_HUMANS breaks (LV1_GO_GO_GO): run the corridor, through a side passage (its trigger adds 300 / 400 to the boss per human, on 850), onto the bridge. final_lasers_boss starts laser_start_timer2 1 s after you step on: every 1-1.2 s blade_random1 sends one of four blades from behind the boss at 1600 u/s (low ones to jump, one at head height to duck; 999999, and each human a blade touches takes 60-100 off the boss). Shoot LV1_END_BOSS. Its death: at +13 s lv1_end_wall closes the way back, at +15 s LV1_FLOOR_BREAK_BOSS drops the bridge (the hurt below is 99999), so be on the platform behind the boss by then. From +15 s to +28 s s_2_timer sends a vertical bar every 0.13 s from one of 13 lanes (sidestep) and s_3_timer a horizontal beam every second (l_l_2 at 32 units: jump; l_l_3 at 64: duck), all 999999 at 2300-2800 u/s down the bridge's line. At +34 s LV1_HW_TP takes the platform out: the win. Anyone still in the arena at +36 s goes to the zombie cage (lv1_zombo_tp_end_all).",
+      "spawn": {
+        "origin": [
+          -12976,
+          8160,
+          12330
+        ],
+        "yaw": 90
+      },
+      "view": {
+        "min": [
+          -14700,
+          1300,
+          11700
+        ],
+        "max": [
+          -11200,
+          15700,
+          13400
+        ]
+      },
+      "fastForward": 50,
+      "start": [
+        {
+          "target": "LV2_BOSS_DOOR",
+          "input": "Break"
+        },
+        {
+          "target": "colorgameplay",
+          "input": "Disable"
+        },
+        {
+          "target": "colorgameplay",
+          "input": "Kill",
+          "delay": 1
+        },
+        {
+          "target": "Color3",
+          "input": "Enable"
+        },
+        {
+          "target": "color4",
+          "input": "Enable",
+          "delay": 10
+        },
+        {
+          "target": "LEVEL1 _ END_MUSIC",
+          "input": "PlaySound"
+        },
+        {
+          "target": "lv1_particle_end",
+          "input": "Start"
+        },
+        {
+          "target": "LV1_TP_10",
+          "input": "Enable",
+          "delay": 10
+        },
+        {
+          "target": "LV1_END_DOOR_HUMANS",
+          "input": "Break",
+          "delay": 56
+        },
+        {
+          "target": "LV1_GO_GO_GO",
+          "input": "PlaySound",
+          "delay": 56
+        }
+      ],
+      "player": {
+        "health": 100
+      },
+      "bosses": [
+        {
+          "target": "LV1_END_BOSS",
+          "name": "Boss"
+        }
+      ],
+      "win": {
+        "target": "LV1_HW_TP",
+        "input": "Enable"
+      },
+      "hazards": {
+        "blade_10h": "a boss blade",
+        "blade_20h": "a boss blade",
+        "blade_30h": "a boss blade",
+        "blade_40h": "a boss blade",
+        "s_h_2": "a vertical laser",
+        "l_l_2_h": "a low laser",
+        "l_l_3_h": "a high laser"
+      }
+    }
+  ]
+}

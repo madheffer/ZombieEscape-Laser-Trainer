@@ -1,6 +1,6 @@
 // Source 1 materials (VMT, KeyValues 1 text): the shader and the flat parameters the bake draws with. "Patch"
 // materials are resolved through their "include" (insert / replace blocks applied), at most a few levels deep.
-// Nested blocks (Proxies, >=dx90 fallbacks) are skipped except the patch blocks; [conditions] are ignored.
+// Nested blocks (>=dx90 fallbacks) are skipped except the patch blocks and Proxies (ProxyList); [conditions] are ignored.
 using System.Text;
 
 namespace Lasers.Bake.Source1;
@@ -9,6 +9,8 @@ sealed class Vmt
 {
     public string Shader = "";
     public readonly Dictionary<string, string> P = new(StringComparer.OrdinalIgnoreCase);
+    // the Proxies block: (proxy name lower case, its pairs), in order (TextureScroll on a Refract's $bumpTransform)
+    public readonly List<(string Name, Dictionary<string, string> Kv)> ProxyList = [];
 
     public string? Get(string k) => P.TryGetValue(k, out var v) ? v : null;
     public bool Flag(string k) => P.TryGetValue(k, out var v) && v.Trim() is "1" or "true";
@@ -45,6 +47,12 @@ sealed class Vmt
         {
             var key = t[i++];
             if (i >= t.Count) break;
+            if (t[i] == "{" && key.Equals("proxies", StringComparison.OrdinalIgnoreCase))
+            {
+                i++;
+                Proxies(t, ref i, m);
+                continue;
+            }
             if (t[i] == "{")
             {
                 i++;
@@ -61,6 +69,28 @@ sealed class Vmt
             }
             m.P[key] = t[i++];
         }
+    }
+
+    // a Proxies block (after its "{"): each proxy's flat pairs, in order; deeper blocks skipped; through its "}"
+    static void Proxies(List<string> t, ref int i, Vmt m)
+    {
+        while (i < t.Count && t[i] != "}")
+        {
+            var name = t[i++];
+            if (i >= t.Count || t[i] != "{") continue;
+            i++;
+            var kv = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var depth = 1;
+            while (i < t.Count && depth > 0)
+            {
+                if (t[i] == "{") { depth++; i++; continue; }
+                if (t[i] == "}") { depth--; i++; continue; }
+                if (depth == 1 && i + 1 < t.Count && t[i + 1] != "{" && t[i + 1] != "}") { kv[t[i]] = t[i + 1]; i += 2; continue; }
+                i++;
+            }
+            if (m.ProxyList.Count < 32) m.ProxyList.Add((name.ToLowerInvariant(), kv));
+        }
+        if (i < t.Count) i++; // the Proxies block's "}"
     }
 
     static IEnumerable<string> Tokens(string s)

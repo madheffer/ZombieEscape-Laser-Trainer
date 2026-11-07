@@ -16,6 +16,7 @@ import { PropAnimator, cloneModel } from './anim.js';
 import { Water } from './water.js';
 import { applyUnlit } from './unlit.js';
 import { applySource1, lightModel } from './source1-light.js';
+import { refractWanted } from './refract-source1.js';
 import { TempEffects } from './temp-effects.js';
 import { Moondome } from './moondome.js';
 import { skyMatrix } from './skybox.js';
@@ -760,7 +761,7 @@ export class Renderer {
     // depth feathering / refraction read the frame after the opaques (scenecopy.js)
     this.water.frame(this.camera, performance.now() / 1000);
     this.effects.frame(performance.now() / 1000);
-    (this.sceneCopy ||= new SceneCopy(this.scene, () => this.water.wantsCopy || sceneCopyWanted())).frame(r, this.hdr, this.camera);
+    (this.sceneCopy ||= new SceneCopy(this.scene, () => refractWanted() || this.water.wantsCopy || sceneCopyWanted())).frame(r, this.hdr, this.camera);
     // the chunks the last frames' queries found hidden stay out of this one; a world in one piece has nothing to cull
     const occlude = this.occlusion && this.chunks.length > 1;
     if (occlude) this.occlusion.apply(this.chunks, this.camera);

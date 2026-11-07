@@ -29,6 +29,7 @@ import './classes/sparks.js';
 import './classes/fade.js';
 import './classes/scripts.js';
 import './classes/color-correction.js';
+import './classes/tonemap-controller.js';
 import './classes/skybox-swapper.js';
 import { runScriptCode, isVscriptAdd } from './classes/vscripts.js';
 import { fogState } from './classes/fog.js';

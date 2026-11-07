@@ -4,9 +4,10 @@
 // ambient-occlusion read is swapped for the RGBM decode, so a texel is albedo x light (linear, 1 = as authored).
 // extras.additive ($additive: lasers, glows) draws added onto what is behind. One replacement per material.
 import * as THREE from 'three';
+import { refractMaterial } from './refract-source1.js';
 
 // Source's HDR tonemap scale (its auto-exposure, clamped to the map's env_tonemap_controller min / max): one value
-// for the whole map here, no adaptation yet. setSource1Exposure() per map (render.js setSky)
+// for the whole frame, measured and adapted every frame by exposure-source1.js (through setSource1Exposure)
 export const source1Exposure = { value: 2 };
 export function setSource1Exposure(v) { source1Exposure.value = Number.isFinite(v) && v > 0 ? Math.min(v, 16) : 2; }
 
@@ -24,6 +25,7 @@ export function applySource1(o) {
 }
 
 function convert(src) {
+  if (src.userData?.refract) return refractMaterial(src); // Source's Refract: the scene behind, warped (refract-source1.js)
   const kind = String(src.userData?.lightmap || '');
   const range = /^rgbm(\d+(\.\d+)?)$/.exec(kind)?.[1];
   const m = new THREE.MeshBasicMaterial({

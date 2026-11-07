@@ -9,7 +9,13 @@ namespace Lasers.Bake.Source1;
 
 sealed class Materials(GameFiles files, Action<string> log)
 {
-    public sealed record Info(string Name, string? Texture, string AlphaMode, float Cutoff, bool DoubleSided, Vector4 Color, int Width, int Height, bool Tool, bool Additive, bool Unlit = false);
+    public sealed record Info(string Name, string? Texture, string AlphaMode, float Cutoff, bool DoubleSided, Vector4 Color, int Width, int Height, bool Tool, bool Additive, bool Unlit = false, RefractInfo? Refract = null);
+
+    // A Refract material (Source's refract shader: the scene behind it warped by a normal map): its $normalmap's PNG,
+    // $refractamount, $bluramount, $refracttint and its TextureScroll proxy on $bumptransform (rate in texture units a
+    // second, angle in degrees). UNSETTLED: the defaults for a key the VMT leaves out (refract.cpp not read): amount 0.5,
+    // blur 1, tint white.
+    public sealed record RefractInfo(string? Normal, float Amount, float Blur, Vector3 Tint, float ScrollRate, float ScrollAngle);
 
     readonly Dictionary<string, Info> cache = new(StringComparer.OrdinalIgnoreCase);
     readonly Dictionary<string, byte[]?> png = new(StringComparer.OrdinalIgnoreCase);
@@ -42,21 +48,45 @@ sealed class Materials(GameFiles files, Action<string> log)
         var alpha = vmt?.Num("$alpha", 1) ?? 1;
         var shader = vmt?.Shader ?? "";
         if (file == null && shader.Contains("water")) { color = new Vector3(0.2f, 0.3f, 0.35f); alpha = 0.6f; translucent = true; }
+        var refract = shader == "refract" && vmt != null ? Refraction(vmt) : null;
+        if (refract != null) { translucent = true; w = h = 0; } // its UVs: the BSP's texdata size (the %tooltexture's)
         var info = new Info(key, file, translucent || alpha < 1 ? "BLEND" : alphaTest ? "MASK" : "OPAQUE",
             vmt?.Num("$alphatestreference", 0.5f) ?? 0.5f, vmt?.Flag("$nocull") == true || translucent,
-            new Vector4(color, alpha), w, h, key.StartsWith("tools/") && key != "tools/toolsblack", additive, shader == "unlitgeneric");
+            new Vector4(color, alpha), w, h, key.StartsWith("tools/") && key != "tools/toolsblack", additive, shader == "unlitgeneric" || refract != null, refract);
         cache[key] = info;
         return info;
     }
 
-    // write the material's PNG into dir (once per dir); false when it has none
+    RefractInfo Refraction(Vmt vmt)
+    {
+        string? normal = null;
+        if (vmt.Get("$normalmap")?.Replace('\\', '/').Trim() is { Length: > 0 } nm)
+        {
+            if (Png(nm, out _, out _) != null) normal = FileName(nm);
+            else Missing.Add($"materials/{GameFiles.Norm(nm)}.vtf");
+        }
+        var tint = vmt.Get("$refracttint") is { } t ? Color(t) : Vector3.One;
+        float rate = 0, angle = 0;
+        foreach (var (name, kv) in vmt.ProxyList)
+        {
+            if (name != "texturescroll" || !string.Equals(kv.GetValueOrDefault("texturescrollvar")?.Trim(), "$bumptransform", StringComparison.OrdinalIgnoreCase)) continue;
+            float.TryParse(kv.GetValueOrDefault("texturescrollrate"), NumberStyles.Float, CultureInfo.InvariantCulture, out rate);
+            float.TryParse(kv.GetValueOrDefault("texturescrollangle"), NumberStyles.Float, CultureInfo.InvariantCulture, out angle);
+        }
+        return new RefractInfo(normal, vmt.Num("$refractamount", 0.5f), vmt.Num("$bluramount", 1), tint, rate, angle);
+    }
+
+    // write the material's PNGs into dir (once per dir): its base texture and a Refract's normal map
     public void WriteImage(Info m, string dir)
     {
-        if (m.Texture == null) return;
-        var path = Path.Combine(dir, m.Texture);
-        if (File.Exists(path)) return;
-        var bytes = png.GetValueOrDefault(TexKeyOf(m.Texture));
-        if (bytes != null) File.WriteAllBytes(path, bytes);
+        foreach (var f in new[] { m.Texture, m.Refract?.Normal })
+        {
+            if (f == null) continue;
+            var path = Path.Combine(dir, f);
+            if (File.Exists(path)) continue;
+            var bytes = png.GetValueOrDefault(TexKeyOf(f));
+            if (bytes != null) File.WriteAllBytes(path, bytes);
+        }
     }
 
     readonly Dictionary<string, string> fileToTex = [];

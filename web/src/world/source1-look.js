@@ -6,7 +6,8 @@
 // left under 1 goes to the identity (UNSETTLED: from the SDK's colorcorrection mgr behaviour as remembered, not
 // decompiled from CS:GO's materialsystem.dll). The lookup is applied to the frame's gamma-space colour, after the tone
 // map: the same place world/tonemap.js applies CS2's (cs2ColorCorrect), whose uniforms this drives for a Source 1 map
-// (which has no post_processing_volume of its own).
+// (which has no post_processing_volume of its own). And its HDR auto-exposure (exposure-source1.js), within the
+// limits its env_tonemap_controller sets.
 import * as THREE from 'three';
 import { safeRelPath } from '../lib/paths.js';
 import { fetchJson, fetchBuffer } from '../lib/fetch.js';
@@ -14,6 +15,7 @@ import { source1Sky } from './source1-light.js';
 import { colorCorrections } from './entities/classes/color-correction.js';
 import { swappedSky } from './entities/classes/skybox-swapper.js';
 import { SmokeTrails } from './smoketrail-source1.js';
+import { Source1AutoExposure } from './exposure-source1.js';
 
 const SKY_FACE = /^sky\/[a-z0-9_-]{1,64}\/(rt|bk|lf|ft|up|dn)\.png$/;
 const RAW_FILE = /^[a-z0-9_]{1,120}\.raw$/;
@@ -53,6 +55,8 @@ export class Source1Look {
     this.luts = luts;
     this.dim = dim;
     this.ccKey = null;
+    this.exposure = new Source1AutoExposure();
+    this.exposureEngine = undefined;
     if (dim) {
       this.tex = new THREE.Data3DTexture(new Uint8Array(dim * dim * dim * 4), dim, dim, dim);
       this.tex.format = THREE.RGBAFormat;
@@ -67,10 +71,12 @@ export class Source1Look {
   update(renderer, engine, eye) {
     this.updateSky(renderer, engine);
     this.updateCorrection(renderer.post, engine, eye);
+    if (engine !== this.exposureEngine) { this.exposureEngine = engine; this.exposure.reset(); } // a new run measures afresh
+    this.exposure.update(renderer, engine);
     (this.smoke ||= new SmokeTrails(this.data.sprites, renderer.scene)).update(engine, renderer.camera);
   }
 
-  dispose() { this.smoke?.dispose(); this.smoke = null; }
+  dispose() { this.smoke?.dispose(); this.smoke = null; this.exposure.dispose(); }
 
   updateSky(renderer, engine) {
     const name = swappedSky(engine);
@@ -91,6 +97,9 @@ export class Source1Look {
     this.ccKey = key;
     if (!list.length) { u.cs2LutWeight.value = 0; return; }
     const total = list.reduce((s, c) => s + c.weight, 0);
+    // unnormalised: the identity takes 1 - sum, negative past 1 (ROADMAP: matches the footage of ze_xenovation's
+    // relay13 green, though the header says otherwise). ze_luciddreams_b5's corridor reaches 1.8 (Color3 blackwhite, an
+    // inverting lookup, + color4 whiteBB): it draws inverted this way; not checked against footage of it
     const scale = 1;
     const ident = 1 - total;
     const d = this.dim, mix = this.mix, out = this.tex.image.data;

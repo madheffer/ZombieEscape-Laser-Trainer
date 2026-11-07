@@ -14,7 +14,7 @@ namespace Lasers.Bake.Source1;
 
 sealed class Glb
 {
-    public sealed record Material(string Name, string? Image, string AlphaMode, float Cutoff, bool DoubleSided, Vector4 Color, string? Lightmap = null, bool Additive = false);
+    public sealed record Material(string Name, string? Image, string AlphaMode, float Cutoff, bool DoubleSided, Vector4 Color, string? Lightmap = null, bool Additive = false, Materials.RefractInfo? Refract = null);
 
     public sealed class Prim
     {
@@ -175,6 +175,16 @@ sealed class Glb
             }
             // $additive: drawn added to what is behind it (glTF has no additive blend; the renderer reads this)
             if (m.Additive) ((JsonObject)(mat["extras"] ??= new JsonObject()))["additive"] = true;
+            // Refract: the scene behind warped by its normal map (normalTexture); the renderer reads extras.refract
+            if (m.Refract is { } rf)
+            {
+                if (rf.Normal != null) mat["normalTexture"] = new JsonObject { ["index"] = Tex(rf.Normal, 0) };
+                ((JsonObject)(mat["extras"] ??= new JsonObject()))["refract"] = new JsonObject
+                {
+                    ["amount"] = rf.Amount, ["blur"] = rf.Blur, ["tint"] = new JsonArray(rf.Tint.X, rf.Tint.Y, rf.Tint.Z),
+                    ["scroll"] = new JsonArray(rf.ScrollRate, rf.ScrollAngle),
+                };
+            }
             if (m.AlphaMode != "OPAQUE") mat["alphaMode"] = m.AlphaMode;
             if (m.AlphaMode == "MASK") mat["alphaCutoff"] = m.Cutoff;
             mats.Add(mat);
