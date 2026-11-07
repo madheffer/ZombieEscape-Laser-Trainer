@@ -14,6 +14,8 @@ import { settings, saveSettings } from './settings.js';
 
 export const PRESET_NAMES = ['low', 'medium', 'high'];
 
+// reflections: the cubemaps, off from Medium down: on a map with many reflection volumes (offliner) they still about
+// double the world pass after the volume box check (world/lighting.js cs2EnvGather)
 // particleDetail: soft particle edges (depth feathering: a full-screen scene copy each frame) and smooth rope / lightning
 // curves (fx/particles/render spritecard.js setSoftParticles, ropes.js setRopeDetail)
 export const PRESETS = {
@@ -22,7 +24,7 @@ export const PRESETS = {
     particleLights: true, streamDistance: 1, bloom: true, particleDetail: true,
   },
   medium: {
-    quality: 2, renderScale: 0.85, pixelCap: 1.5, msaa: false, fog: true, reflections: true, bakedLighting: true,
+    quality: 2, renderScale: 0.85, pixelCap: 1.5, msaa: false, fog: true, reflections: false, bakedLighting: true,
     particleLights: true, streamDistance: 1, bloom: true, particleDetail: true,
   },
   low: {

@@ -19,16 +19,22 @@ let frame = 0;
 // does a Refract surface want the scene copy this frame (one was drawn in the last few frames)
 export function refractWanted() { frame++; return frame - lastDrawn <= 3; }
 
-const VS = `varying vec2 vUv; varying vec3 vViewPos;
+// skinned like any other mesh of the model (ze_lifeforms_v1_1's protozoan membranes move with their bones)
+const VS = `#include <common>
+#include <skinning_pars_vertex>
+varying vec2 vUv; varying vec3 vViewPos;
 void main() {
   vUv = uv;
-  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  #include <begin_vertex>
+  #include <skinbase_vertex>
+  #include <skinning_vertex>
+  vec4 mv = modelViewMatrix * vec4(transformed, 1.0);
   vViewPos = mv.xyz;
   gl_Position = projectionMatrix * mv;
 }`;
 
-const FS = `uniform sampler2D tNormal; uniform sampler2D uSceneColor; uniform vec2 uViewport;
-uniform float uAmount, uBlur, uTime, uHasNormal; uniform vec3 uTint; uniform vec2 uScroll;
+const FS = `uniform sampler2D tNormal; uniform sampler2D tTint; uniform sampler2D uSceneColor; uniform vec2 uViewport;
+uniform float uAmount, uBlur, uTime, uHasNormal, uHasTint; uniform vec3 uTint; uniform vec2 uScroll;
 varying vec2 vUv; varying vec3 vViewPos;
 void main() {
   vec2 uv = vUv + uScroll * uTime;
@@ -47,21 +53,26 @@ void main() {
   vec3 c = texture2D(uSceneColor, at).rgb * 0.4
     + (texture2D(uSceneColor, at + vec2(px.x, 0.0)).rgb + texture2D(uSceneColor, at - vec2(px.x, 0.0)).rgb
      + texture2D(uSceneColor, at + vec2(0.0, px.y)).rgb + texture2D(uSceneColor, at - vec2(0.0, px.y)).rgb) * 0.15;
-  gl_FragColor = vec4(c * uTint, 1.0);
+  vec3 tt = uHasTint > 0.5 ? texture2D(tTint, vUv).rgb : vec3(1.0);
+  gl_FragColor = vec4(c * uTint * tt, 1.0);
 }`;
 
 const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
 
-// a glb material with userData.refract -> its Refract material (src.normalMap: the glb's normalTexture)
+// a glb material with userData.refract -> its Refract material (src.normalMap: the glb's normalTexture; src.map: its
+// $refracttinttexture). src may be a clone of one made here (render.js applyTint): its textures are in its uniforms.
 export function refractMaterial(src) {
   const r = src.userData.refract || {};
+  const normal = src.normalMap || src.uniforms?.tNormal?.value || null;
+  const tintMap = src.map || src.uniforms?.tTint?.value || null;
   const tint = Array.isArray(r.tint) ? r.tint.map((v) => Math.max(0, num(v, 1))) : [1, 1, 1];
   const [rate, angle] = Array.isArray(r.scroll) ? r.scroll.map((v) => num(v, 0)) : [0, 0];
   const a = (angle * Math.PI) / 180;
   const m = new THREE.ShaderMaterial({
     name: src.name,
     uniforms: {
-      tNormal: { value: src.normalMap || null }, uHasNormal: { value: src.normalMap ? 1 : 0 },
+      tNormal: { value: normal }, uHasNormal: { value: normal ? 1 : 0 },
+      tTint: { value: tintMap }, uHasTint: { value: tintMap ? 1 : 0 },
       uSceneColor: sceneCopyUniforms.uSceneColor, uViewport: sceneCopyUniforms.uViewport,
       uAmount: { value: Math.min(1, Math.max(0, num(r.amount, 0.5))) },
       uBlur: { value: Math.min(8, Math.max(0, num(r.blur, 1))) },
@@ -72,7 +83,7 @@ export function refractMaterial(src) {
     vertexShader: VS, fragmentShader: FS,
     transparent: true, depthWrite: false, side: THREE.DoubleSide, toneMapped: false,
   });
-  if (src.normalMap) { src.normalMap.wrapS = src.normalMap.wrapT = THREE.RepeatWrapping; src.normalMap.colorSpace = THREE.NoColorSpace; src.normalMap.needsUpdate = true; }
+  if (normal) { normal.wrapS = normal.wrapT = THREE.RepeatWrapping; normal.colorSpace = THREE.NoColorSpace; normal.needsUpdate = true; }
   m.userData = { ...src.userData };
   m.onBeforeRender = () => { lastDrawn = frame; };
   return m;

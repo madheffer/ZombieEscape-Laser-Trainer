@@ -106,6 +106,9 @@ static class Source1Bake
 
         // 4. glbs: the world, then each brush entity model (textures beside each glb)
         var mats = new Materials(files, Log);
+        // the env_cubemaps first: a compiled VMT's $envmap names one (CubemapBake.cs)
+        var cubemaps = CubemapBake.Bake(bsp, files, mapName, outDir, Log);
+        mats.CubeIndex = cubemaps.IndexOf;
         var worldDir = Path.Combine(outDir, "world");
         Directory.CreateDirectory(worldDir);
         var atlas = LightmapAtlas.Build(bsp);
@@ -137,7 +140,7 @@ static class Source1Bake
             renderModels.Add(Entities.BrushModelPath(mapName, n));
         }
         Log($"models: {renderModels.Count} brush models drawn");
-        StampAmbient(lumps, ambient, brushModelPaths);
+        StampAmbient(lumps, ambient, brushModelPaths, cubemaps);
         SkyArea.Stamp(lumps, bsp, mapName, Log); // the entities its sky_camera draws as the 3D skybox
         File.WriteAllText(Path.Combine(outDir, "entities.json"), new JsonObject { ["engine"] = "source1", ["lumps"] = lumps.DeepClone() }.ToJsonString());
         var animations = new JsonObject();
@@ -183,6 +186,7 @@ static class Source1Bake
             ["missingMaterials"] = new JsonArray([.. mats.Missing.Select(x => (JsonNode)x!)]),
         };
         if (sky != null) manifest["sky2d"] = sky;
+        if (cubemaps.Count > 0) manifest["cubemaps"] = "cubemaps/cubemaps.json";
         if (skySets.Count > 0) manifest["sky2dSets"] = skySets;
         manifest["sprites"] = "sprites/sprites.json";
         manifest["correction"] = "correction/correction.json";
@@ -248,7 +252,7 @@ static class Source1Bake
     // each studio-model entity's ambient cube (+X -X +Y -Y +Z -Z, 18 numbers, linear) as "_s1light": the renderer lights
     // its model with it (world/source1-light.js). Where it spawns: its origin, a template member's at its template's
     // place (the point_template's origin + its local origin), 16 units up from the model's base
-    static void StampAmbient(JsonObject lumps, AmbientLight ambient, HashSet<string> brushModels)
+    static void StampAmbient(JsonObject lumps, AmbientLight ambient, HashSet<string> brushModels, CubemapBake cubemaps)
     {
         static Vector3 Vec(string? s)
         {
@@ -267,7 +271,15 @@ static class Source1Bake
                 var model = kv?["model"]?.GetValue<string>();
                 if (kv == null || model == null || !model.EndsWith(".mdl", StringComparison.OrdinalIgnoreCase) || brushModels.Contains(model)) continue;
                 var at = Vec(kv["origin"]?.GetValue<string>()) + (lump == "default_ents" ? Vector3.Zero : tplOrigin.GetValueOrDefault(lump)) + new Vector3(0, 0, 16);
-                kv["_s1light"] = string.Join(' ', ambient.LitCube(at).SelectMany(c => new[] { c.X, c.Y, c.Z }).Select(f => MathF.Round(f, 4).ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                static string Nums(IEnumerable<float> v) => string.Join(' ', v.Select(f => MathF.Round(f, 4).ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                kv["_s1light"] = Nums(ambient.LitCube(at, AmbientLight.WorldLights, out var local).SelectMany(c => new[] { c.X, c.Y, c.Z }));
+                // its local lights, 16 numbers each: position, intensity (linear), spot direction, type (1 point, 2 spot),
+                // constant / linear / quadratic falloff, stopdot, stopdot2, exponent (world/source1-vlg.js)
+                // the env_cubemap nearest it: an "env_cubemap" $envmap reflects it (CubemapBake.cs)
+                if (cubemaps.Nearest(at) is var cm and >= 0) kv["_s1cube"] = cm.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                if (local.Count > 0)
+                    kv["_s1lights"] = Nums(local.SelectMany(l => new[] { l.Origin.X, l.Origin.Y, l.Origin.Z, l.Intensity.X, l.Intensity.Y, l.Intensity.Z,
+                        l.Normal.X, l.Normal.Y, l.Normal.Z, (float)l.Type, l.C, l.L, l.Q, l.StopDot, l.StopDot2, l.Exponent }));
             }
     }
 

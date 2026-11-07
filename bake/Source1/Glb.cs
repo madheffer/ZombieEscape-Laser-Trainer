@@ -14,12 +14,12 @@ namespace Lasers.Bake.Source1;
 
 sealed class Glb
 {
-    public sealed record Material(string Name, string? Image, string AlphaMode, float Cutoff, bool DoubleSided, Vector4 Color, string? Lightmap = null, bool Additive = false, Materials.RefractInfo? Refract = null, float? BlendCutoff = null);
+    public sealed record Material(string Name, string? Image, string AlphaMode, float Cutoff, bool DoubleSided, Vector4 Color, string? Lightmap = null, bool Additive = false, Materials.RefractInfo? Refract = null, float? BlendCutoff = null, Materials.Glow? Glow = null, Materials.Proxies? Proxies = null);
 
     public sealed class Prim
     {
         public int Material;
-        public readonly List<float> Pos = [], Nrm = [], Uv = [], Uv1 = [], Col = [], Wgt = [];
+        public readonly List<float> Pos = [], Nrm = [], Uv = [], Uv1 = [], Col = [], Wgt = [], Tan = [];
         public readonly List<ushort> Jnt = [];
         public readonly List<uint> Idx = [];
         public int Count => Pos.Count / 3;
@@ -33,6 +33,10 @@ sealed class Glb
             Uv1.Add(uv1.X); Uv1.Add(uv1.Y);
             return (uint)(Pos.Count / 3 - 1);
         }
+
+        // the last vertex's tangent (Source space xyz, w the binormal sign), converted as its normal; a prim writes
+        // TANGENT only when every vertex has one
+        public void AddTangent(Vector4 t) { Tan.Add(t.Y); Tan.Add(t.Z); Tan.Add(t.X); Tan.Add(t.W); }
 
         // a skinned vertex: up to 4 joints (skin joint indices) and their weights
         public uint Add(Vector3 p, Vector3 n, Vector2 uv, ReadOnlySpan<ushort> joints, ReadOnlySpan<float> weights)
@@ -128,6 +132,7 @@ sealed class Glb
                 ["TEXCOORD_1"] = Acc(p.Uv1, 2, "VEC2", false),
             };
             if (p.Col.Count == p.Pos.Count) attrs["COLOR_0"] = Acc(p.Col, 3, "VEC3", false);
+            if (p.Tan.Count == p.Count * 4 && p.Count > 0) attrs["TANGENT"] = Acc(p.Tan, 4, "VEC4", false);
             if (Skeleton != null && p.Jnt.Count == p.Count * 4)
             {
                 var jointBytes = new byte[p.Jnt.Count * 2];
@@ -184,6 +189,79 @@ sealed class Glb
                     ["amount"] = rf.Amount, ["blur"] = rf.Blur, ["tint"] = new JsonArray(rf.Tint.X, rf.Tint.Y, rf.Tint.Z),
                     ["scroll"] = new JsonArray(rf.ScrollRate, rf.ScrollAngle),
                 };
+            }
+            // what a VertexLitGeneric draws beyond albedo x light (Materials.Glow; world/source1-light.js draws it):
+            // extras.selfillum = $selfillumtint, extras.skin (the skin shader's order), extras.rim, extras.detailAdd (the
+            // detail in the emissive slot), extras.emissiveBlend; textures glTF has no slot for are listed by index in
+            // extras.s1Textures by file name beside the glb (world/source1-textures.js loads them; an index would not survive
+            // tools/chunk-world.mjs' prune)
+            if (m.Glow is { } g)
+            {
+                var ex = (JsonObject)(mat["extras"] ??= new JsonObject());
+                var more = new JsonObject();
+                if (g.SelfIllum is { } si) ex["selfillum"] = new JsonArray(si.X, si.Y, si.Z);
+                if (g.SelfIllum != null && g.SelfIllumMask != null) more["selfIllumMask"] = g.SelfIllumMask;
+                if (g.Skin) ex["skin"] = true;
+                if (g.Bump != null) mat["normalTexture"] = new JsonObject { ["index"] = Tex(g.Bump, 0) }; // linear (glTF)
+                if (g.SelfIllumFresnel is { } sf) ex["selfillumFresnel"] = new JsonArray(sf.X, sf.Y, sf.Z, sf.W);
+                if (g.HalfLambert) ex["halfLambert"] = true;
+                if (g.Env is { } en)
+                {
+                    ex["envmap"] = new JsonObject
+                    {
+                        ["cube"] = en.Cube, ["tint"] = new JsonArray(en.Tint.X, en.Tint.Y, en.Tint.Z), ["contrast"] = en.Contrast,
+                        ["saturation"] = en.Saturation, ["fresnel"] = en.Fresnel, ["lmFresnel"] = en.LmFresnel, ["mask"] = en.Mask,
+                    };
+                    if (en.MaskTex != null) more["envmapMask"] = en.MaskTex;
+                }
+                if (g.Phong is { } ph)
+                {
+                    ex["phong"] = new JsonObject
+                    {
+                        ["exponent"] = ph.Exponent, ["boost"] = ph.Boost, ["fresnel"] = new JsonArray(ph.Fresnel.X, ph.Fresnel.Y, ph.Fresnel.Z),
+                        ["baseAlphaMask"] = ph.BaseAlphaMask, ["albedoTint"] = ph.AlbedoTint, ["rimExponent"] = ph.RimExponent,
+                        ["rimMask"] = ph.RimMask, ["tint"] = ph.TintSet ? new JsonArray(g.PhongTint.X, g.PhongTint.Y, g.PhongTint.Z) : null,
+                    };
+                    if (ph.ExponentTexture != null) more["phongExponent"] = ph.ExponentTexture;
+                    if (ph.LightWarp != null) more["lightWarp"] = ph.LightWarp;
+                }
+                if (g.RimBoost is { } rb) ex["rim"] = new JsonObject { ["boost"] = rb, ["tint"] = new JsonArray(g.PhongTint.X, g.PhongTint.Y, g.PhongTint.Z) };
+                if (g.Detail != null)
+                {
+                    mat["emissiveTexture"] = new JsonObject { ["index"] = Tex(g.Detail, 0) };
+                    mat["emissiveFactor"] = new JsonArray(1, 1, 1);
+                    ex["detailAdd"] = new JsonObject
+                    {
+                        ["scale"] = g.DetailScale, ["factor"] = g.DetailFactor,
+                        ["tint"] = new JsonArray(g.DetailTint.X, g.DetailTint.Y, g.DetailTint.Z),
+                    };
+                }
+                if (g.Emissive is { } em)
+                {
+                    more["emissiveBase"] = em.Base;
+                    more["emissive"] = em.Texture;
+                    if (em.Flow != null) more["emissiveFlow"] = em.Flow;
+                    ex["emissiveBlend"] = new JsonObject
+                    {
+                        ["scroll"] = new JsonArray(em.Scroll.X, em.Scroll.Y), ["tint"] = new JsonArray(em.Tint.X, em.Tint.Y, em.Tint.Z),
+                        ["strength"] = em.Strength,
+                    };
+                }
+                if (more.Count > 0) ex["s1Textures"] = more;
+            }
+            // material proxies (Materials.Proxies; world/source1-proxies.js runs them)
+            if (m.Proxies is { } px)
+            {
+                var list = new JsonArray();
+                foreach (var (name, kv) in px.List)
+                {
+                    var o = new JsonObject();
+                    foreach (var (k, v) in kv) o[k] = v;
+                    list.Add(new JsonObject { ["name"] = name, ["kv"] = o });
+                }
+                var vars = new JsonObject();
+                foreach (var (k, v) in px.Vars) vars[k] = v;
+                ((JsonObject)(mat["extras"] ??= new JsonObject()))["s1Proxies"] = new JsonObject { ["list"] = list, ["vars"] = vars };
             }
             if (m.AlphaMode != "OPAQUE") mat["alphaMode"] = m.AlphaMode;
             if (m.AlphaMode == "MASK") mat["alphaCutoff"] = m.Cutoff;

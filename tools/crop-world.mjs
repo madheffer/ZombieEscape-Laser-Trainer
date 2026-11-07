@@ -94,6 +94,8 @@ fs.writeFileSync(src, await packGlb(doc));
 console.log(`world: ${before} -> ${after} triangles, ${kb0} -> ${fs.statSync(src).size >> 10} KB`);
 // textures no material uses any more
 const used = new Set(doc.getRoot().listTextures().map((t) => t.getURI()).filter(Boolean));
+// and the ones a Source 1 material names by file in extras.s1Textures (bake/Source1/Glb.cs)
+for (const m of doc.getRoot().listMaterials()) for (const f of Object.values(m.getExtras()?.s1Textures || {})) if (typeof f === 'string') used.add(f);
 let gone = 0;
 for (const f of fs.readdirSync(path.dirname(src))) {
   if (f.endsWith('.png') && f !== 'lightmap.png' && !used.has(f)) { fs.unlinkSync(path.join(path.dirname(src), f)); gone++; }

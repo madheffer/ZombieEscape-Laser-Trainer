@@ -18,6 +18,9 @@ sealed class StudioModel
         public readonly List<int> Idx = [];
         // the unposed vertex (VVD as stored, the skeleton's bind space) and its bone weights, for a skinned export
         public readonly List<Vector3> RawPos = [], RawNrm = [];
+        // the VVD's tangentS per vertex (xyz, w the binormal sign: the shaders build T = cross(N, S) x w,
+        // common_vs_fxc.h SkinPositionNormalAndTangentSpace), posed as Nrm is / as stored; empty without tangent data
+        public readonly List<Vector4> Tan = [], RawTan = [];
         public readonly List<(byte B0, byte B1, byte B2, float W0, float W1, float W2)> Weights = [];
     }
 
@@ -73,6 +76,7 @@ sealed class StudioModel
         // vertices: VVD LOD 0 through the fixups
         if (Encoding.ASCII.GetString(vvd, 0, 4) != "IDSV") throw new InvalidDataException("not a VVD");
         int numFix = I(vvd, 48), fixStart = I(vvd, 52), vStart = I(vvd, 56), lod0Count = I(vvd, 16);
+        var tStart = vvd.Length >= 64 ? I(vvd, 60) : 0; // vertexFileHeader_t.tangentDataStart: a Vector4 per vertex
         var raw = new List<int>();
         if (numFix == 0) for (var i = 0; i < lod0Count; i++) raw.Add(i);
         else
@@ -156,6 +160,14 @@ sealed class StudioModel
                                 mesh.Pos.Add(VPos(vi)); mesh.Nrm.Add(VNrm(vi)); mesh.Uv.Add(VUv(vi));
                                 var vo = vStart + raw[vi] * 48;
                                 mesh.RawPos.Add(V3(vvd, vo + 16)); mesh.RawNrm.Add(V3(vvd, vo + 28));
+                                var to = tStart + raw[vi] * 16;
+                                if (tStart > 0 && to >= 0 && to + 16 <= vvd.Length)
+                                {
+                                    var ts = V3(vvd, to);
+                                    var tw = BitConverter.ToSingle(vvd, to + 12) < 0 ? -1f : 1f;
+                                    mesh.RawTan.Add(new Vector4(ts, tw));
+                                    mesh.Tan.Add(new Vector4(Skinned(vo, ts, true), tw));
+                                }
                                 var nb = Math.Clamp((int)vvd[vo + 15], 1, 3);
                                 mesh.Weights.Add((vvd[vo + 12], nb > 1 ? vvd[vo + 13] : (byte)0, nb > 2 ? vvd[vo + 14] : (byte)0,
                                     nb == 1 ? 1 : BitConverter.ToSingle(vvd, vo), nb > 1 ? BitConverter.ToSingle(vvd, vo + 4) : 0, nb > 2 ? BitConverter.ToSingle(vvd, vo + 8) : 0));

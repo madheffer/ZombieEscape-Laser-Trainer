@@ -7,7 +7,69 @@ static class Vtf
 {
     const int MaxSide = 8192;
 
-    public sealed record Image(int Width, int Height, byte[] Rgba, bool HasAlpha);
+    // Translucent: the VTF flags ONEBITALPHA | EIGHTBITALPHA (0x1000 | 0x2000), what ITexture::IsTranslucent reads (a
+    // VertexLitGeneric drops $selfillum on a base texture without it: vertexlitgeneric_dx9_helper.cpp, skin_dx9_helper.cpp)
+    public sealed record Image(int Width, int Height, byte[] Rgba, bool HasAlpha, bool Translucent = false);
+
+    // A cube VTF's 6 faces (mip 0, frame 0) as linear rgb floats, each resampled (box) to CubemapBake.Face px:
+    // RGBA16161616 (24) as value / 65535 x 16 (ENV_MAP_SCALE, CubemapBake.cs), any other format through
+    // its 8-bit decode, sRGB -> linear. null when it isn't a cube or can't be read.
+    public static float[][]? DecodeCube(byte[] d)
+    {
+        if (d.Length < 64 || d[0] != 'V' || d[1] != 'T' || d[2] != 'F' || d[3] != 0) return null;
+        int minor = BitConverter.ToInt32(d, 8), headerSize = BitConverter.ToInt32(d, 12);
+        int w = BitConverter.ToUInt16(d, 16), h = BitConverter.ToUInt16(d, 18);
+        uint flags = BitConverter.ToUInt32(d, 20);
+        int frames = Math.Max(1, (int)BitConverter.ToUInt16(d, 24)), firstFrame = BitConverter.ToUInt16(d, 26);
+        int fmt = BitConverter.ToInt32(d, 52), mips = d[56], lowFmt = BitConverter.ToInt32(d, 57);
+        int lowW = d[61], lowH = d[62];
+        if ((flags & 0x4000) == 0 || w == 0 || h == 0 || w > 2048 || h > 2048 || mips == 0 || mips > 16) return null;
+        var faces = minor < 5 && firstFrame != 0xffff ? 7 : 6;
+        long start = -1;
+        if (minor >= 3 && d.Length >= 80)
+        {
+            var n = BitConverter.ToInt32(d, 68);
+            for (var i = 0; i < n && 80 + i * 8 + 8 <= d.Length && i < 32; i++)
+            {
+                var o = 80 + i * 8;
+                if (d[o] == 0x30 && d[o + 1] == 0 && d[o + 2] == 0) start = BitConverter.ToUInt32(d, o + 4);
+            }
+        }
+        if (start < 0) start = headerSize + (lowFmt >= 0 && lowW > 0 ? Size(lowFmt, lowW, lowH) : 0);
+        for (var m = mips - 1; m >= 1; m--) start += (long)Size(fmt, Math.Max(1, w >> m), Math.Max(1, h >> m)) * frames * faces;
+        var len = Size(fmt, w, h);
+        if (len <= 0 || start < 0 || start + len * 6L > d.Length) return null;
+        const int F = CubemapBake.Face;
+        var outFaces = new float[6][];
+        for (var f = 0; f < 6; f++)
+        {
+            var src = d.AsSpan((int)(start + (long)f * len), len);
+            var lin = new float[w * h * 3];
+            if (fmt == 24)
+                for (var i = 0; i < w * h; i++)
+                    for (var c = 0; c < 3; c++) lin[i * 3 + c] = BitConverter.ToUInt16(src.Slice(i * 8 + c * 2, 2)) / 65535f * 16f;
+            else
+            {
+                var rgba = ToRgba(fmt, src, w, h);
+                if (rgba == null) return null;
+                for (var i = 0; i < w * h; i++)
+                    for (var c = 0; c < 3; c++) { var v = rgba[i * 4 + c] / 255f; lin[i * 3 + c] = v <= 0.04045f ? v / 12.92f : MathF.Pow((v + 0.055f) / 1.055f, 2.4f); }
+            }
+            var o = new float[F * F * 3];
+            for (var y = 0; y < F; y++)
+                for (var x = 0; x < F; x++)
+                {
+                    int x0 = x * w / F, x1 = Math.Max(x0 + 1, (x + 1) * w / F), y0 = y * h / F, y1 = Math.Max(y0 + 1, (y + 1) * h / F);
+                    float r = 0, g = 0, b = 0; var n = 0;
+                    for (var yy = y0; yy < y1 && yy < h; yy++)
+                        for (var xx = x0; xx < x1 && xx < w; xx++) { var s = (yy * w + xx) * 3; r += lin[s]; g += lin[s + 1]; b += lin[s + 2]; n++; }
+                    n = Math.Max(1, n);
+                    o[(y * F + x) * 3] = r / n; o[(y * F + x) * 3 + 1] = g / n; o[(y * F + x) * 3 + 2] = b / n;
+                }
+            outFaces[f] = o;
+        }
+        return outFaces;
+    }
 
     public static Image? Decode(byte[] d)
     {
@@ -42,7 +104,7 @@ static class Vtf
         var rgba = ToRgba(fmt, d.AsSpan((int)start, len), w, h);
         if (rgba == null) return null;
         var alpha = fmt is 0 or 1 or 6 or 8 or 11 or 12 or 14 or 15 or 19 or 20 or 21;
-        return new Image(w, h, rgba, alpha);
+        return new Image(w, h, rgba, alpha, (flags & 0x3000) != 0);
     }
 
     static int Size(int fmt, int w, int h) => fmt switch

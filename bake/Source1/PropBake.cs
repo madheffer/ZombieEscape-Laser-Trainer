@@ -86,7 +86,7 @@ static class PropBake
                 if (!matIndex.TryGetValue(key, out var mi))
                 {
                     mi = world.Materials.Count;
-                    world.Materials.Add(new Glb.Material(info.Name, info.Texture, info.AlphaMode, info.Cutoff, info.DoubleSided, info.Color, "vertex", info.Additive, info.Refract, info.BlendCutoff));
+                    world.Materials.Add(new Glb.Material(info.Name, info.Texture, info.AlphaMode, info.Cutoff, info.NoCull, info.Color, "vertex", info.Additive, info.Refract, info.BlendCutoff, info.Glow, info.Proxies));
                     matIndex[key] = mi;
                     used.Add(info);
                 }
@@ -96,6 +96,7 @@ static class PropBake
                 {
                     var n = Vector3.Normalize(Rot(mesh.Nrm[i]));
                     prim.Add(Rot(mesh.Pos[i] * sp.Scale) + sp.Origin, n, mesh.Uv[i], AmbientLight.Eval(cube, n));
+                    if (mesh.Tan.Count == mesh.Pos.Count) { var t = mesh.Tan[i]; prim.AddTangent(new Vector4(Vector3.Normalize(Rot(new Vector3(t.X, t.Y, t.Z))), t.W)); }
                 }
                 foreach (var ix in mesh.Idx) prim.Idx.Add(first + (uint)ix);
             }
@@ -190,7 +191,7 @@ static class PropBake
                 if (!matIndex.TryGetValue(info.Name, out var mi))
                 {
                     mi = glb.Materials.Count;
-                    glb.Materials.Add(new Glb.Material(info.Name, info.Texture, info.AlphaMode, info.Cutoff, info.DoubleSided, info.Color, "cube", info.Additive, info.Refract, info.BlendCutoff));
+                    glb.Materials.Add(new Glb.Material(info.Name, info.Texture, info.AlphaMode, info.Cutoff, info.NoCull, info.Color, "cube", info.Additive, info.Refract, info.BlendCutoff, info.Glow, info.Proxies));
                     matIndex[info.Name] = mi;
                     used.Add(info);
                 }
@@ -198,12 +199,15 @@ static class PropBake
                 var first = (uint)prim.Count;
                 for (var i = 0; i < mesh.Pos.Count; i++)
                 {
-                    if (sk == null) { prim.Add(mesh.Pos[i], mesh.Nrm[i], mesh.Uv[i], Vector2.Zero); continue; }
+                    // the VVD tangents (posed / as stored, as the normals): TANGENT (the shaders' tangentS + binormal sign)
+                    var tan = mesh.Tan.Count == mesh.Pos.Count;
+                    if (sk == null) { prim.Add(mesh.Pos[i], mesh.Nrm[i], mesh.Uv[i], Vector2.Zero); if (tan) prim.AddTangent(mesh.Tan[i]); continue; }
                     var w = mesh.Weights[i];
                     var sum = w.W0 + w.W1 + w.W2;
                     if (sum <= 0) sum = 1;
                     ushort Bone(byte b) => (ushort)Math.Min(b, sk.Count - 1);
                     prim.Add(mesh.RawPos[i], mesh.RawNrm[i], mesh.Uv[i], [Bone(w.B0), Bone(w.B1), Bone(w.B2), 0], [w.W0 / sum, w.W1 / sum, w.W2 / sum, 0]);
+                    if (tan) prim.AddTangent(mesh.RawTan[i]);
                 }
                 foreach (var ix in mesh.Idx) prim.Idx.Add(first + (uint)ix);
             }

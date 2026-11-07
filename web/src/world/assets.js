@@ -6,6 +6,8 @@
 import { source1Sky } from './source1-light.js';
 import { mergeSkybox } from './skybox.js';
 import { Source1Sprites } from './sprites-source1.js';
+import { Source1Textures } from './source1-textures.js';
+import { loadSource1Cubemaps } from './source1-cubemaps.js';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
@@ -42,7 +44,8 @@ function glbLoader(version, mapBase = '', tex = null) {
     return versioned(url, version);
   });
   const textures = new Map(); // one map's loads share it: see SharedTextures
-  return new GLTFLoader(manager).setMeshoptDecoder(MeshoptDecoder).register((parser) => new SharedTextures(parser, textures));
+  return new GLTFLoader(manager).setMeshoptDecoder(MeshoptDecoder).register((parser) => new SharedTextures(parser, textures))
+    .register((parser) => new Source1Textures(parser)); // a Source 1 material's extra textures (source1-textures.js)
 }
 
 // A GLTFLoader plugin: a texture file is fetched and decoded once for every glb of the map. The world's chunks
@@ -190,6 +193,8 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   const sky2d = source1Sky(manifest.sky2d, url, manifest.engine);
   // and its env_sprite glows (lasers-bake source1: manifest sprites), null for a map without them
   const sprites = await Source1Sprites.load(manifest, url, fetchJson);
+  // and its env_cubemaps, what a $envmap reflects (lasers-bake source1: manifest cubemaps)
+  await loadSource1Cubemaps(manifest, url, fetchJson);
   // GFL's edits (lib/stripper.js): what can be turned off, and the map with some off, built on demand (mapEdits)
   const edits = { list: stripperEdits(stripper, name), off: '', variants: new Map([['', { entities, items }]]), raw, stripper, skybox, entwatch };
   return { name, version, url, skins, manifest, entities, collision, collisionFx, physics, hulls, bounds, animations, soundDurations: sounds, world, chunks, loadChunk, getModel, particles: fx, items, radar, effects, water, sky2d, sprites, edits };

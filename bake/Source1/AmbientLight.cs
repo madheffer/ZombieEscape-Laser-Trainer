@@ -120,13 +120,30 @@ sealed class AmbientLight
         return lights;
     }
 
+    // r_worldlightmin's default, and the luminance weights engine.dll ranks lights by (0x105ad320)
+    const float WorldLightMin = 0.0002f;
+    static readonly Vector3 Luminance = new(0.299f, 0.587f, 0.114f);
+    public const int WorldLights = 3; // r_worldlights' default
+
     static readonly Vector3[] Axes = [Vector3.UnitX, -Vector3.UnitX, Vector3.UnitY, -Vector3.UnitY, Vector3.UnitZ, -Vector3.UnitZ];
 
     // the leaf cube with the visible world lights folded in: what lights a model at p
-    public Vector3[] LitCube(Vector3 p)
+    public Vector3[] LitCube(Vector3 p) => LitCube(p, 0, out _);
+
+    // A dynamic model's light (an entity's prop_dynamic): the maxLocal most important visible point / spot lights at p
+    // stay local lights the shader evaluates per pixel (diffuse and the phong specular: common_vertexlitgeneric_dx9.h
+    // PixelShaderDoLighting / PixelShaderDoSpecularLighting, VertexAttenInternal), the rest are folded into the cube.
+    // From CS:GO's engine.dll: r_worldlights defaults to "3" (FUN_1001a3b0; FUN_10241550 clamps it to the hardware's
+    // max lights); a light is dropped when max(intensity) x its distance falloff x style / 264 < r_worldlightmin
+    // ("0.0002", FUN_10242ed0); its importance is dot(intensity, (0.299, 0.587, 0.114)) x that falloff (no cone,
+    // FUN_10245080), the least important beyond the count is folded into the cube; the falloff is
+    // 1 / (constant + linear d + quadratic d^2), 0 past a set radius (FUN_10139040, read from its SSE).
+    public Vector3[] LitCube(Vector3 p, int maxLocal, out List<WorldLight> local)
     {
+        local = [];
         if (Fullbright) return [Vector3.One, Vector3.One, Vector3.One, Vector3.One, Vector3.One, Vector3.One];
         var cube = Cube(p).ToArray();
+        var seen = new List<(WorldLight L, Vector3 Dir, float Ratio, float Mag)>();
         foreach (var l in Lights())
         {
             if (l.Type is not (1 or 2)) continue; // emit_point, emit_spotlight
@@ -148,9 +165,15 @@ sealed class AmbientLight
                     ratio *= l.Exponent > 0 && l.Exponent != 1 ? MathF.Pow(t, l.Exponent) : t;
                 }
             }
-            var mag = ratio * Math.Max(l.Intensity.X, Math.Max(l.Intensity.Y, l.Intensity.Z));
-            if (mag < 1e-4f) continue; // too faint to see: skip the trace
+            // engine.dll's test and importance take the distance falloff alone (1 / denom), not the spot cone
+            if (Math.Max(l.Intensity.X, Math.Max(l.Intensity.Y, l.Intensity.Z)) / denom < WorldLightMin) continue;
             if (TraceSolid(l.Origin, p)) continue;
+            seen.Add((l, dir, ratio, Vector3.Dot(l.Intensity, Luminance) / denom));
+        }
+        var keep = seen.OrderByDescending(s => s.Mag).Take(Math.Max(0, maxLocal)).Select(s => s.L).ToHashSet();
+        foreach (var (l, dir, ratio, _) in seen)
+        {
+            if (keep.Contains(l)) { local.Add(l); continue; }
             for (var i = 0; i < 6; i++)
             {
                 var t = Vector3.Dot(Axes[i], dir);

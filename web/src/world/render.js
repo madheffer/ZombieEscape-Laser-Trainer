@@ -16,7 +16,7 @@ import { Bloom, BLOOM_POST_GLSL } from './bloom.js';
 import { PropAnimator, cloneModel } from './anim.js';
 import { Water } from './water.js';
 import { applyUnlit } from './unlit.js';
-import { applySource1, lightModel } from './source1-light.js';
+import { applySource1, lightModel, keepMeshOrder } from './source1-light.js';
 import { refractWanted } from './refract-source1.js';
 import { TempEffects } from './temp-effects.js';
 import { Moondome } from './moondome.js';
@@ -445,6 +445,7 @@ export class Renderer {
             group.userData.skins = skins.has(e.model) ? skins : null;
             applyTint(e, inst); // rendercolor / renderamt, and again whenever a Color / Alpha input changes them
             lightModel(inst, kv); // a Source 1 model: the ambient cube where it spawned (no-op otherwise)
+            keepMeshOrder(inst); // a Source 1 model's meshes drawn in its own order (source1-light.js)
             group.add(holder);
             // probe-lit like the props (world/lighting.js): placed first, so the probe volume is picked where the
             // entity is; a mover picks again as it goes (updateEntities -> lighting.refreshProbes)

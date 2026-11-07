@@ -27,6 +27,25 @@ function overlaps(trigger, box) {
   return false;
 }
 
+// The box around an entity's placed hulls, or null without any. A pair whose boxes miss can't pass overlaps() (each
+// hull pair tests its own boxes first), so physicsTouches skips the physics query for it: the same result, without
+// a call into the physics world per trigger x physbox (westersand's Chaos fight: ~2800 a tick, half the tick)
+// (kept per placed-hulls array: hulls() hands back the same array until the entity moves, so a box a touch handler
+// teleports mid-pass gets its new box)
+const hullBoxes = new WeakMap();
+function hullBox(e) {
+  const hs = e.hulls();
+  if (!hs?.length) return null;
+  let b = hullBoxes.get(hs);
+  if (b) return b;
+  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (const h of hs) for (let k = 0; k < 3; k++) { if (h.min[k] < lo[k]) lo[k] = h.min[k]; if (h.max[k] > hi[k]) hi[k] = h.max[k]; }
+  b = [lo, hi];
+  hullBoxes.set(hs, b);
+  return b;
+}
+const boxesMeet = (a, b) => !!a && !!b && a[0][0] <= b[1][0] && a[1][0] >= b[0][0] && a[0][1] <= b[1][1] && a[1][1] >= b[0][1] && a[0][2] <= b[1][2] && a[1][2] >= b[0][2];
+
 function endTouch(engine, e, box) {
   const set = e.state.physTouch;
   set.delete(box);
@@ -47,7 +66,7 @@ export function physicsTouches(engine) {
       if (!e.alive || e.sky || e.state.removeAt != null) { for (const b of [...touching]) touching.delete(b); continue; }
       const sf = num(e.kv.spawnflags);
       for (const box of boxes) {
-        const reported = w.triggerTouches(box.state.body, sf, !!e.enabled) && overlaps(e, box);
+        const reported = boxesMeet(hullBox(e), hullBox(box)) && w.triggerTouches(box.state.body, sf, !!e.enabled) && overlaps(e, box);
         const was = touching.has(box);
         if (reported && !was) {
           // StartTouch: the flag test and the filter decide whether it counts

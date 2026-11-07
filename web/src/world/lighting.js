@@ -86,7 +86,10 @@ export class MapLighting {
       cs2CubeRgbm: { value: 0 }, cs2CubeWorld: { value: 1 } };
     this.cubeBoxes = []; // each volume's world box (its edge-fade padding included), row order
     this._frustum = new THREE.Frustum(); this._viewProj = new THREE.Matrix4();
-    this.cubeCount = 0; // the map's; the uniform is 0 while reflections are off (the loop then costs nothing)
+    // the map's; the uniform is 0 while reflections are off (the loop then costs nothing). The materials compile the
+    // cubemap code whenever the map has cubemaps, so the setting switches without a recompile and a map with
+    // cubemaps never falls back to three's stand-in environment (getIBLRadiance: costlier, and not CS2's)
+    this.cubeCount = 0;
     // particle lights (C_OP_RenderStandardLight as CS2's barn lights, fx/particles/render/lights.js), world space
     this.barnUniforms = barnUniforms();
     this._barnOrder = [];
@@ -141,11 +144,17 @@ export class MapLighting {
     camera.updateMatrixWorld();
     this._viewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this._frustum.setFromProjectionMatrix(this._viewProj);
-    const data = order.image.data;
+    // two rows: (box min, the volume's row) and (box max), so a pixel outside the box skips the volume after two
+    // texel reads instead of seven (its edge fade there is 0: the same picture). The box grows by a unit against
+    // float rounding at its faces, where the fade is 0 anyway.
+    const data = order.image.data, W = order.image.width;
     let n = 0, key = '';
     for (let r = 0; r < this.cubeBoxes.length; r++) {
-      if (!this._frustum.intersectsBox(this.cubeBoxes[r])) continue;
-      data[n++] = r; key += r + ',';
+      const b = this.cubeBoxes[r];
+      if (!this._frustum.intersectsBox(b)) continue;
+      data.set([b.min.x - 1, b.min.y - 1, b.min.z - 1, r], n * 4);
+      data.set([b.max.x + 1, b.max.y + 1, b.max.z + 1, 0], (W + n) * 4);
+      n++; key += r + ',';
     }
     cu.cs2CubeVisible.value = n;
     if (key !== this._cubeKey) { this._cubeKey = key; order.needsUpdate = true; }
@@ -321,7 +330,7 @@ export class MapLighting {
     cu.cs2CubeCount.value = this.options.reflections ? vols.length : 0;
     // the shader's padded local box (lo - 0.1 .. hi + 0.1), placed in the world: what cullCubes tests
     this.cubeBoxes = vols.map((v) => new THREE.Box3(new THREE.Vector3(...v.lo).subScalar(0.1), new THREE.Vector3(...v.hi).addScalar(0.1)).applyMatrix4(v.ent));
-    const order = new THREE.DataTexture(new Float32Array(vols.length), vols.length, 1, THREE.RedFormat, THREE.FloatType);
+    const order = new THREE.DataTexture(new Float32Array(vols.length * 2 * 4), vols.length, 2, THREE.RGBAFormat, THREE.FloatType);
     order.minFilter = order.magFilter = THREE.NearestFilter;
     cu.cs2CubeOrder.value = order;
     this._cubeKey = null;
@@ -485,14 +494,14 @@ export class MapLighting {
       Object.assign(shader.uniforms, uniforms, this.fogUniforms, this.cubeUniforms, this.mapLights.uniforms);
       shader.vertexShader = worldPosVertex(shader.vertexShader);
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <lightmap_pars_fragment>', `#include <lightmap_pars_fragment>\n${PROBE_PARS}\n${MAP_LIGHTS_PARS}\n${FOG_PARS}\n${CUBE_PARS(this.cubeUniforms.cs2CubeCount.value > 0)}`)
+        .replace('#include <lightmap_pars_fragment>', `#include <lightmap_pars_fragment>\n${PROBE_PARS}\n${MAP_LIGHTS_PARS}\n${FOG_PARS}\n${CUBE_PARS(this.cubeCount > 0)}`)
         // the map's lights unshadowed here: the bake keeps only the sun's probe visibility (ProbeBake.cs face alpha)
         .replace('#include <lights_fragment_begin>', PROBE_SUN + LIGHTS_BEGIN_PATCHED + BARN_GATHER + MAP_LIGHTS_GATHER)
         .replace('#include <lights_fragment_maps>', LIGHTS_MAPS_PROBES)
         .replace('#include <fog_fragment>', FOG_APPLY);
       shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>\n${BARN_PARS}`);
       Object.assign(shader.uniforms, this.barnUniforms);
-    }, `cs2probemfb${this.cubeUniforms.cs2CubeCount.value > 0 ? 'c' : ''}`);
+    }, `cs2probemfb${this.cubeCount > 0 ? 'c' : ''}`);
     return m;
   }
 
@@ -506,13 +515,13 @@ export class MapLighting {
       Object.assign(shader.uniforms, this.fogUniforms, this.cubeUniforms);
       shader.vertexShader = worldPosVertex(shader.vertexShader);
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <lightmap_pars_fragment>', `#include <lightmap_pars_fragment>\n${PARS(hasDir, hasShadow)}\n${MAP_LIGHTS_PARS}\nvarying vec3 vCs2World;\n${FOG_PARS}\n${CUBE_PARS(this.cubeUniforms.cs2CubeCount.value > 0)}`)
+        .replace('#include <lightmap_pars_fragment>', `#include <lightmap_pars_fragment>\n${PARS(hasDir, hasShadow)}\n${MAP_LIGHTS_PARS}\nvarying vec3 vCs2World;\n${FOG_PARS}\n${CUBE_PARS(this.cubeCount > 0)}`)
         .replace('#include <lights_fragment_begin>', SUN_VISIBILITY + LIGHTS_BEGIN_PATCHED + BARN_GATHER + MAP_LIGHTS_GATHER)
         .replace('#include <lights_fragment_maps>', LIGHTS_MAPS_CS2)
         .replace('#include <fog_fragment>', FOG_APPLY);
       shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>\n${BARN_PARS}`);
       Object.assign(shader.uniforms, this.barnUniforms);
-    }, `cs2lmm${hasDir ? 'd' : ''}${hasShadow ? 's' : ''}fb${this.cubeUniforms.cs2CubeCount.value > 0 ? 'c' : ''}`);
+    }, `cs2lmm${hasDir ? 'd' : ''}${hasShadow ? 's' : ''}fb${this.cubeCount > 0 ? 'c' : ''}`);
     return m;
   }
 }
@@ -837,7 +846,8 @@ const CUBE_PARS = (on) => !on ? '' : `
 uniform highp sampler2DArray cs2Cubes;      // layer = array_index * 6 + face (+X -X +Y -Y +Z -Z)
 uniform highp sampler2D cs2CubeVolumes;     // 7 texels per volume, in priority order
 uniform int cs2CubeCount;
-uniform highp sampler2D cs2CubeOrder;       // the volumes in view this frame (rows of cs2CubeVolumes, by priority)
+uniform highp sampler2D cs2CubeOrder;       // the volumes in view this frame, by priority: (world box min, row of
+                                            // cs2CubeVolumes), (world box max) (lighting.js cullCubes)
 uniform int cs2CubeVisible;
 uniform vec2 cs2CubeMips;                   // CS2's mip count, mips the bake skipped
 uniform float cs2CubeRgbm;                  // the low tier's RGBM faces: rgb x a x range (0: HDR blocks as they are)
@@ -851,7 +861,10 @@ vec4 cs2EnvGather( vec3 posWS, vec3 N, vec3 R, float parallaxRough, float lod ) 
   // bounded by the uniform, not a constant: a constant bound gets fully unrolled by ANGLE's D3D compiler
   for ( int k = 0; k < cs2CubeVisible; k++ ) {
     if ( total > 0.99 ) break;
-    int i = int( texelFetch( cs2CubeOrder, ivec2( k, 0 ), 0 ).r );
+    vec4 bmin = texelFetch( cs2CubeOrder, ivec2( k, 0 ), 0 );
+    vec3 bmax = texelFetch( cs2CubeOrder, ivec2( k, 1 ), 0 ).xyz;
+    if ( any( lessThan( posWS, bmin.xyz ) ) || any( greaterThan( posWS, bmax ) ) ) continue; // outside its box: fade 0
+    int i = int( bmin.w );
     mat3x4 w2l = mat3x4( cs2Vol( i, 0 ), cs2Vol( i, 1 ), cs2Vol( i, 2 ) );
     vec3 lp = vec4( posWS, 1.0 ) * w2l;
     vec4 mn = cs2Vol( i, 3 ); vec3 mx = cs2Vol( i, 4 ).xyz; vec3 inv = cs2Vol( i, 5 ).xyz;

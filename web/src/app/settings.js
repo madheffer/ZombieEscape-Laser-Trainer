@@ -99,7 +99,7 @@ function perMap(v, clean, keep) {
 }
 
 // Saved settings from before a default changed get it once: v2 turned the team's boss fire off by default.
-const SETTINGS_VERSION = 4;
+const SETTINGS_VERSION = 5;
 function migrate(saved) {
   if (!saved || typeof saved !== 'object') return {};
   const v = Number.isInteger(saved.settingsVersion) ? saved.settingsVersion : 1;
@@ -111,6 +111,8 @@ function migrate(saved) {
   }
   // v4 added particleDetail to the presets: a saved Low gets Low's (off), the rest keep the default (on)
   if (v < 4 && out.graphics === 'low' && !('particleDetail' in saved)) out.particleDetail = false;
+  // v5 turned Medium's reflections off: a saved Medium follows it (a hand-set Reflections is 'custom' and keeps it)
+  if (v < 5 && out.graphics === 'medium') out.reflections = false;
   return out;
 }
 

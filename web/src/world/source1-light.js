@@ -2,14 +2,21 @@
 // the lightmap atlas in the occlusion slot (TEXCOORD_1) with extras.lightmap = "rgbm<range>"; here each becomes an
 // unlit MeshBasicMaterial (Source's LightmappedGeneric is texture x lightmap, no runtime lights) whose
 // ambient-occlusion read is swapped for the RGBM decode, so a texel is albedo x light (linear, 1 = as authored).
-// extras.additive ($additive: lasers, glows) draws added onto what is behind. One replacement per material.
+// extras.additive ($additive: lasers, glows) draws added onto what is behind. A VertexLitGeneric's self-illum, detail,
+// rim light and emissive blend go on top (source1-vlg.js). One replacement per material.
 import * as THREE from 'three';
 import { refractMaterial } from './refract-source1.js';
+import { vertexLitExtras, setLocalLights, setEnvCube } from './source1-vlg.js';
 
 // Source's HDR tonemap scale (its auto-exposure, clamped to the map's env_tonemap_controller min / max): one value
 // for the whole frame, measured and adapted every frame by exposure-source1.js (through setSource1Exposure)
 export const source1Exposure = { value: 2 };
 export function setSource1Exposure(v) { source1Exposure.value = Number.isFinite(v) && v > 0 ? Math.min(v, 16) : 2; }
+
+// a converted material keeps its extra textures through clone() (render.js applyTint clones it)
+class Source1Material extends THREE.MeshBasicMaterial {
+  copy(src) { super.copy(src); this.s1Detail = src.s1Detail || null; this.s1Tex = src.s1Tex || null; return this; }
+}
 
 const replaced = new WeakMap(); // glb material -> its Source 1 material
 const done = new WeakSet();
@@ -28,7 +35,7 @@ function convert(src) {
   if (src.userData?.refract) return refractMaterial(src); // Source's Refract: the scene behind, warped (refract-source1.js)
   const kind = String(src.userData?.lightmap || '');
   const range = /^rgbm(\d+(\.\d+)?)$/.exec(kind)?.[1];
-  const m = new THREE.MeshBasicMaterial({
+  const m = new Source1Material({
     name: src.name, map: src.map, color: src.color, transparent: src.transparent, opacity: src.opacity,
     // extras.alphaTest: a $translucent + $alphatest material, blended and alpha-tested as Source draws it
     alphaTest: Number(src.userData?.alphaTest) > 0 ? Math.min(1, Number(src.userData.alphaTest)) : src.alphaTest, side: src.side, depthWrite: src.depthWrite, aoMap: range ? src.aoMap : null,
@@ -38,6 +45,9 @@ function convert(src) {
   if (kind === 'vertex') vertexLight(m);
   else if (kind === 'cube') cubeLight(m);
   patch(m, range); // the atlas decode (rgbm only) and $additive
+  // the glb's normal map rides in s1Tex from here on (a converted material has no normalMap slot)
+  const tex = { ...(src.s1Tex || {}), normal: src.s1Tex?.normal || src.normalMap || null };
+  vertexLitExtras(m, src.s1Detail || src.emissiveMap || null, tex, source1Exposure);
   return m;
 }
 
@@ -87,7 +97,34 @@ export function lightModel(inst, kv) {
     }
     const c = o.material.s1Cube?.value;
     if (c) for (let i = 0; i < 6; i++) c[i].set(v[i * 3], v[i * 3 + 1], v[i * 3 + 2]);
+    setLocalLights(o.material, kv?._s1lights); // its local lights, per pixel (source1-vlg.js)
+    setEnvCube(o.material, kv?._s1cube); // the cubemap an "env_cubemap" $envmap reflects
   });
+}
+
+// Source draws a model's translucent meshes in the model's own order; three sorts them by each one's bounding-sphere
+// depth, which for the sub-meshes of one model flips with the view. One shared sphere (their union) gives them one
+// depth, so three falls back to their ids: the glb's order. ze_lifeforms_v1_1's protozoa: the Refract membrane (it
+// writes the refracted frame, alpha 1) comes before the cells and organelles inside it, as in the game, instead of
+// covering them with a black disc in the dark shaft. Culling uses the union, which holds every sub-mesh.
+export function keepMeshOrder(inst) {
+  const meshes = [];
+  inst.traverse((o) => { if (o.isMesh && (o.material?.userData?.lightmap === 'cube' || o.material?.userData?.refract)) meshes.push(o); });
+  if (meshes.length < 2) return;
+  inst.updateMatrixWorld(true);
+  const m0 = meshes[0].matrixWorld;
+  if (!meshes.every((o) => o.matrixWorld.equals(m0) && o.isSkinnedMesh === meshes[0].isSkinnedMesh)) return; // spheres in one space only
+  const sphereOf = (o) => {
+    if (o.isSkinnedMesh) { if (!o.boundingSphere) o.computeBoundingSphere(); return o.boundingSphere; }
+    if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere();
+    return o.geometry.boundingSphere;
+  };
+  const union = sphereOf(meshes[0]).clone();
+  for (const o of meshes.slice(1)) union.union(sphereOf(o));
+  for (const o of meshes) {
+    if (o.isSkinnedMesh) o.boundingSphere = union.clone();
+    else o.geometry.boundingSphere = union.clone(); // the same model's geometry: the same union in every instance
+  }
 }
 
 function patch(m, range) {
