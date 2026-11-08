@@ -20,6 +20,7 @@ import { playerMark } from './marks.js';
 import { plural } from '../lib/format.js';
 import { cameraPosition } from './camera.js';
 import { perfFrame } from './perf.js';
+import { autoResFrame } from './auto-res.js';
 import { pushPlayer, solidMatrices, crusher } from '../world/push.js';
 
 let acc = 0;
@@ -205,7 +206,9 @@ export function frame(now) {
   }
   // the frame rate (the meter) and the slow-PC check: only frames of a run being played count (app/perf.js)
   const throttled = S.paused && !S.mp && !S.replay; // the paused redraws above: not the game's pace
-  perfFrame(now, { throttled, live: !!S.run && S.run.ready && S.run.go && !S.run.done && !S.run.spectating && !throttled && !S.replay });
+  const playing = !!S.run && S.run.ready && S.run.go && !S.run.done && !S.run.spectating && !throttled && !S.replay;
+  perfFrame(now, { throttled, live: playing });
+  autoResFrame(now, { live: playing }); // render resolution down while frames are slow (app/auto-res.js)
   hudClock += realDt;
   if (S.run && hudClock >= 0.05) { hudClock = 0; updateHud(); }
 }

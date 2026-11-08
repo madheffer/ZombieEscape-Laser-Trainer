@@ -21,6 +21,7 @@ import { MapEffects } from '../fx/effects.js';
 import { chunkList } from './stream.js';
 import { soundDurations } from '../lib/sound-durations.js';
 import { loadPhysics } from './physics-world.js';
+import { mergeStaticModel } from './merge-model.js';
 
 // VRF exports glTF in metres, Y up: gltf = (src.y, src.z, src.x) * 0.0254. This puts it back in Source units.
 export const GLTF_TO_SOURCE = new THREE.Matrix4().set(
@@ -175,12 +176,16 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   const renderModels = new Set((Array.isArray(manifest.renderModels) ? manifest.renderModels : []).map(assetKey));
   const modelBase = base + manifestPath(manifest.models, 'models/');
   const modelCache = new Map();
+  const noMerge = new URLSearchParams(location.search).has('nomerge');
   const getModel = (path) => {
     const key = assetKey(path);
     if (!renderModels.has(key)) return null;
     if (!modelCache.has(key)) {
       const rel = safeRelPath(key.replace(/\.v?mdl$/, '.glb')); // CS2 .vmdl, Source 1 .mdl (lasers-bake source1)
-      modelCache.set(key, rel == null ? Promise.resolve(null) : loadGlb(loader, modelBase + rel).catch(() => null));
+      // a CS2 model's meshes joined by material (world/merge-model.js); a Source 1 model keeps its own draw order.
+      // ?nomerge: as exported (comparisons)
+      const join = manifest.engine === 'source1' || noMerge ? (sc) => sc : mergeStaticModel;
+      modelCache.set(key, rel == null ? Promise.resolve(null) : loadGlb(loader, modelBase + rel).then(join).catch(() => null));
     }
     return modelCache.get(key);
   };

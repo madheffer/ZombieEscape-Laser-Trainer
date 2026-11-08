@@ -44,6 +44,7 @@ export const DEFAULTS = {
   // 'custom' after a hand change. pixelCap: the screen pixel ratio render resolution multiplies (phones are 3x). particleLights: effects
   // lighting the world. particleDetail: soft particles + smooth ropes. graphicsChosen: the player picked a preset (the map list stops asking)
   graphics: 'medium', pixelCap: 2, particleLights: true, bloom: true, particleDetail: true, graphicsChosen: false,
+  autoRes: true, // render resolution steps down while frames are slow (app/auto-res.js); not a preset knob: on in every preset
   streamDistance: 1, // a streamed world (world/stream.js): 1 auto (area, then what can be seen), 2 area only, 0 the whole map
   touchSens: 1, touchCrouch: false, // phone / tablet: look speed multiplier, crouch as a toggle instead of hold
   // GFL's map edits turned off, per map: { <map>: [edit ids] } (lib/stripper.js; ui/stripper-settings.js). Solo only
@@ -171,7 +172,7 @@ export function bindSettings(onChange) {
   bindPair('#gamma', '#gamma-num', 'gamma', 1, 2.5, onChange, 0.05);
   bind('#renderscale', 'renderScale', (v) => `${Math.round(v * 100)}%`); bind('#msaa', 'msaa');
   bind('#fog', 'fog'); bind('#reflections', 'reflections'); bind('#bakedlighting', 'bakedLighting'); bind('#quality', 'quality'); bind('#streamdistance', 'streamDistance');
-  bind('#bloom', 'bloom'); bind('#particlelights', 'particleLights'); bind('#particledetail', 'particleDetail');
+  bind('#bloom', 'bloom'); bind('#particlelights', 'particleLights'); bind('#particledetail', 'particleDetail'); bind('#autores', 'autoRes');
   // 0-1 like CS2's console values: game sound (the menu's #volume pair, labelled SFX) and `snd_musicvolume`
   bindPair('#mastervol', '#mastervol-num', 'master', 0, 1, onChange, 0.01);
   bindPair('#volume', '#volume-num', 'sfx', 0, 1, onChange, 0.01);

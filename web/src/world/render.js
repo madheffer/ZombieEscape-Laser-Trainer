@@ -143,9 +143,20 @@ export class Renderer {
     setSoftParticles(particleDetail !== false);
     setRopeDetail(particleDetail !== false);
     this.water.setQuality(!reflections ? 'low' : !msaa ? 'medium' : 'high');
-    const ratio = Math.min(window.devicePixelRatio, Math.max(0.5, pixelCap)) * Math.min(1, Math.max(0.25, renderScale));
-    if (Math.abs(this.renderer.getPixelRatio() - ratio) > 1e-3) { this.renderer.setPixelRatio(ratio); this.resize(); }
+    this.baseRatio = Math.min(window.devicePixelRatio, Math.max(0.5, pixelCap)) * Math.min(1, Math.max(0.25, renderScale));
+    this.applyRatio();
     if (this.msaa !== msaa) { this.msaa = msaa; if (this.hdr) { this.hdr.dispose(); this.hdr = null; this.blitScene = null; } }
+  }
+
+  // Auto resolution (app/auto-res.js): a factor on the settings' render resolution while frames are slow (1 = off)
+  setAutoScale(f) {
+    this.autoScale = f;
+    this.applyRatio();
+  }
+
+  applyRatio() {
+    const ratio = (this.baseRatio ?? this.renderer.getPixelRatio()) * (this.autoScale ?? 1);
+    if (Math.abs(this.renderer.getPixelRatio() - ratio) > 1e-3) { this.renderer.setPixelRatio(ratio); this.resize(); }
   }
 
   resize() {
