@@ -40,6 +40,7 @@ import { RoomDsp } from './dsp.js';
 import { followCurve, fadeOut, randomAround } from './shape.js';
 import { SurfaceSounds } from './surfaces.js';
 import { ALIASES, readTable, fileUrl } from './tables.js';
+import { MusicLoop } from './music-loop.js';
 import { DEFAULT_GUN, DEFAULT_PISTOL, gunSounds } from '../lib/weapons.js';
 
 
@@ -63,6 +64,7 @@ export class GameAudio {
     this.voices = new Set();
     this.byEnt = new Map();     // ent.id -> Set<voice>
     this.limits = new VoiceLimits();
+    this.musicLoop = new MusicLoop(); // endless: the map's music keeps going (setMusicLoop)
     this.surfaces = new SurfaceSounds(); // the map's surface sounds (bullet impacts, prop breaks)
     this.listener = { pos: [0, 0, 0], yaw: 0, pitch: 0 };
     this.paused = true; // the menu is up at boot; resume() on entering a stage
@@ -270,12 +272,16 @@ export class GameAudio {
     for (const v of [...this.voices]) this._stopVoice(v, true);
     for (const set of this.chains.values()) for (const c of set) { c.stopped = true; clearTimeout(c.timer); }
     this.chains.clear();
+    this.musicLoop.clear();
     this.byEnt.clear();
     this.limits.clear();
     this.layers.clear();
     this.dsp.setPreset('core_null'); // a new run starts in the mix graph's default room
     if (this.held) this.held = []; // a restart drops what the old run asked for while the table loaded
   }
+
+  // endless mode: a music track that ends by itself starts the next one this run played (audio/music-loop.js)
+  setMusicLoop(on) { this.musicLoop.on = !!on; }
 
   // For audio-test.html: which events/files resolved.
   report() {
@@ -391,7 +397,7 @@ export class GameAudio {
       const v = {
         def, name: def.name, sources: [], gain: null, pan: null, env: null, send: null, ent: o.ent, entId: o.entId,
         pos: randomPos || (o.pos ? [...o.pos] : null), fixedPos: !!randomPos,
-        slot: o.slot ?? null, follow: o.follow || null, repeat: !!o.repeat, guid: o.guid || 0,
+        slot: o.slot ?? null, follow: o.follow || null, repeat: !!o.repeat, guid: o.guid || 0, request: o,
         offset: o.offset || 0, // seconds already played (a stage that starts mid-ending joins its music mid-track)
         spatial: !isMusic && (!!randomPos || (!!o.pos && !o.local && !def.local)), music: isMusic, rate,
         // the event's volume (+ its random variance; a snd_event_param "volume" replaces it) x the request's; the mix
@@ -486,14 +492,15 @@ export class GameAudio {
     v.sources.push(src);
     if (v.def.timeCurve) followCurve(v.env.gain, v.def.timeCurve, ctx.currentTime - Math.max(0, v.offset));
     this._update(v, true);
-    src.onended = () => { if (!src.loop || v.stopped) this._finish(v); };
+    if (v.music && !src.loop) this.musicLoop.note(v.name, v.request, buf.duration / v.rate);
+    src.onended = () => { if (!src.loop || v.stopped) this._ended(v); };
     // joining late: skip what has already played (wrap inside the loop for looping sounds)
     let off = Math.max(0, v.offset * v.rate - (v.def.delay || 0));
     if (off > 0) {
       if (src.loop) {
         const ls = src.loopStart || 0, le = src.loopEnd || buf.duration;
         if (off > le) off = ls + ((off - ls) % Math.max(0.01, le - ls));
-      } else if (off >= buf.duration) { this._finish(v); return; }
+      } else if (off >= buf.duration) { this._ended(v); return; }
     }
     src.start(ctx.currentTime + (off > 0 ? 0 : v.def.delay || 0), off);
   }
@@ -540,6 +547,14 @@ export class GameAudio {
     for (const s of v.sources) { try { s.stop(t + end); } catch { /* not started */ } }
     if (!v.sources.length) this._untrack(v);
     else setTimeout(() => this._finish(v), end * 1000 + 50);
+  }
+
+  // a voice's source finished: a music track that ran out by itself (not stopped) may hand on to the next (endless)
+  _ended(v) {
+    const natural = !v.stopped && this.voices.has(v);
+    this._finish(v);
+    const next = natural && v.music && this.musicLoop.next(v.name, this.voices);
+    if (next) this._start(next.name, { ...next.o });
   }
 
   _finish(v) {

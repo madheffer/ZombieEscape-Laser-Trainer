@@ -49,6 +49,7 @@ export function startScenario(i, mode = 'normal') {
   S.scenarioIndex = i;
   const scenario = S.scenario = i >= 0 ? S.scenarios[i] : null;
   const endless = mode === 'endless' && !!scenario?.endless;
+  G.audio.setMusicLoop(endless); // the map's music was timed for a stage that ends: endless keeps it going
   // what of the map this stage draws (world/view-box.js): the whole map unless the scenario names a view box
   const view = viewBox(scenario);
   G.renderer.setViewBox(view);

@@ -305,6 +305,7 @@ exact map-folder format so he can lift our maps straight into his site. See [REA
 - [ ] **Sign-out on the co-op socket** — the socket keeps the SteamID it opened with until it reconnects
 - [ ] **Rate-limit /api/** — the read endpoints are indexed and capped at 100 rows, but have no per-address limit yet
 - [ ] **Leaderboard filters** — by humans/boss-HP settings and ping, so a 200 ms run isn't ranked against 0 ms
+- [x] **Endless music never runs out (2026-11-08)** — a map track that ends by itself (not stopped by the map) starts again; several tracks played this run cycle in order; stings under 20 s are skipped (`audio/music-loop.js`)
 - [ ] **Endless difficulty ramp** — balls/lasers speed up or overlap more the longer you last (a scenario `endless.ramp`), instead of a flat repeat
 - [ ] **Escape-dragon endless** — the chase ends by geography; a loop (teleport back + respawn the boss) would make it endless
 - [ ] **Verify armor vs map damage live** — CS2Fixes gives `item_assaultsuit`; we assume armor doesn't absorb `DMG_ENERGYBEAM` (CS:GO's `bDamageTypeApplyToArmor` = bullet/blast/club/slash). Check on our server: one ball with and without `!kev`
