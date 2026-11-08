@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { mapName, safeRelPath, assetKey, versioned } from '../lib/paths.js';
+import { readVis } from '../lib/vis-table.js';
 import { fetchJson, fetchBuffer, fetchBufferProgress, FRESH } from '../lib/fetch.js';
 import { applyStripper, stripperEdits, resolveChoice } from '../lib/stripper.js';
 import { normaliseHulls } from './hulls.js';
@@ -123,6 +124,8 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
     fetchBuffer(url('physics.bin')).catch(() => null),
     loadPhysics(new URL(`${import.meta.env?.BASE_URL || '/'}rubikon/_framework/dotnet.js`, location.href).href),
   ]).then(([bin, ok]) => (ok && isPhysicsBin(bin) ? bin : null));
+  // optional: CS2's precomputed visibility (lasers-bake vis.bin, lib/vis-table.js), for world/vis.js
+  const visFile = manifest.vis === 'vis.bin' ? fetchBuffer(url('vis.bin')).then(readVis).catch(() => null) : Promise.resolve(null);
   const [entities, hullsRaw, colBuf, particles, entwatch, overview, animations, stripper, skybox, skins] = await Promise.all([
     fetchJson(url('entities.json')),
     fetchJson(url(manifestPath(manifest.hulls, 'hulls.json'))).catch(() => ({})),
@@ -152,6 +155,7 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   mergeSkybox(entities, skybox);
   const [fxBuf, fxLayerBuf] = await fxFiles;
   const physics = await physicsFile;
+  const vis = await visFile;
   const collisionFx = fxBuf && fxLayerBuf && fxBuf.byteLength === fxLayerBuf.byteLength * 9 ? { tris: new Float32Array(fxBuf), layers: new Uint32Array(fxLayerBuf) } : null;
   const collision = new Float32Array(colBuf);
 
@@ -197,7 +201,7 @@ export async function loadMap(name, onProgress = () => {}, opts = {}) {
   await loadSource1Cubemaps(manifest, url, fetchJson);
   // GFL's edits (lib/stripper.js): what can be turned off, and the map with some off, built on demand (mapEdits)
   const edits = { list: stripperEdits(stripper, name), off: '', variants: new Map([['', { entities, items }]]), raw, stripper, skybox, entwatch };
-  return { name, version, url, skins, manifest, entities, collision, collisionFx, physics, hulls, bounds, animations, soundDurations: sounds, world, chunks, loadChunk, getModel, particles: fx, items, radar, effects, water, sky2d, sprites, edits };
+  return { name, version, url, skins, manifest, entities, collision, collisionFx, physics, vis, hulls, bounds, animations, soundDurations: sounds, world, chunks, loadChunk, getModel, particles: fx, items, radar, effects, water, sky2d, sprites, edits };
 }
 
 // Put a loaded map (S.map) on the entities a run plays: the map's edits with `choice`'s left out and its counts

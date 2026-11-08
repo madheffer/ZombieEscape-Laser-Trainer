@@ -11,6 +11,8 @@
 //     EXT_mesh_gpu_instancing node per mesh; the renderer splits each by probe volume, per instance centre
 //   - editor-only tool materials (render.js hides them anyway) are dropped
 //   - geometry is meshopt-compressed (normals / tangents quantised; positions and UVs stay float)
+//   - with the map's CS2 visibility (lasers-bake vis.bin): joins stay within a 1024-unit sub-cell and every node gets
+//     extras.vis, the clusters it lies in (tools/chunk-vis.mjs), for the game's PVS culling (web/src/world/vis.js)
 // -> world/chunk_<n>.glb (images stay the world's own PNGs beside them, so quality tiers still swap them) and
 //    world/chunks.json { version, cell, chunks: [{ file, min, max, always, tris }] }; manifest.json gets "chunks".
 // The original world glb stays (lasers.cybo.dev reads it, and the game falls back to it).
@@ -20,10 +22,11 @@ import { NodeIO, getBounds, Logger } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTMeshGPUInstancing, EXTMeshoptCompression } from '@gltf-transform/extensions';
 import { dedup, prune, joinPrimitives, transformPrimitive, reorder, quantize } from '@gltf-transform/functions';
 import { MeshoptEncoder, MeshoptDecoder } from 'meshoptimizer';
+import { readVis } from '../web/src/lib/vis-table.js';
+import { visGroup, tagVis } from './chunk-vis.mjs';
+import { toSrc, xform } from './source-space.mjs';
 
 const TOOL = /tools?(trigger|clip|nodraw|skip|invisible|playerclip|blocklight|areaportal|sky)/i; // render.js setWorld
-const M = 1 / 0.0254; // glTF metres -> Source inches; glTF (x, y, z) = Source (y, z, x)
-const toSrc = (v) => [v[2] * M, v[0] * M, v[1] * M];
 
 const args = process.argv.slice(2);
 const dir = args.find((a) => !a.startsWith('--'));
@@ -37,6 +40,9 @@ const worldRel = String(manifest.world || '');
 if (!/^world\/[\w.-]+\.glb$/.test(worldRel)) { console.error(`manifest.world isn't world/<name>.glb: ${worldRel}`); process.exit(1); }
 const worldDir = path.join(mapDir, 'world');
 const src = path.join(mapDir, worldRel);
+// CS2's visibility (lasers-bake: vis.bin): joins stay within a vis sub-cell and every node is tagged with its clusters
+// (tools/chunk-vis.mjs), so the game hides what the camera's cluster can't see (web/src/world/vis.js)
+const vis = manifest.vis === 'vis.bin' && fs.existsSync(path.join(mapDir, 'vis.bin')) ? await readVis(fs.readFileSync(path.join(mapDir, 'vis.bin'))) : null;
 
 await MeshoptEncoder.ready;
 await MeshoptDecoder.ready;
@@ -94,11 +100,6 @@ function splittable(node) {
     : p.getAttribute('TEXCOORD_1') && p.getMaterial()?.getAlphaMode() !== 'BLEND'));
 }
 
-// column-major 4x4 times a point
-function xform(m, x, y, z) {
-  return [m[0] * x + m[4] * y + m[8] * z + m[12], m[1] * x + m[5] * y + m[9] * z + m[13], m[2] * x + m[6] * y + m[10] * z + m[14]];
-}
-
 // each triangle's cell key and Source bounds
 function triangleCells(node, prim) {
   const m = node.getWorldMatrix();
@@ -147,6 +148,7 @@ for (const f of fs.readdirSync(worldDir)) if (/^chunk_\d+\.glb$/.test(f)) fs.unl
 const out = [];
 const keys = [...assign.keys()].sort((a, b) => (a === 'always' ? -1 : b === 'always' ? 1 : a.localeCompare(b)));
 let n = 0, drawsBefore = 0, drawsAfter = 0;
+const visStats = { tagged: 0, untagged: 0, add(s) { this.tagged += s.tagged; this.untagged += s.untagged; } };
 for (const key of keys) {
   const doc = await readWorld(); // same order as pass 1 (deterministic read + dedup)
   const root = doc.getRoot();
@@ -183,7 +185,7 @@ for (const key of keys) {
     for (const p of prims) {
       const mat = p.getMaterial();
       if (mat?.getAlphaMode() === 'BLEND' || !p.getIndices()) continue; // stays as it is
-      const sig = `${root.listMaterials().indexOf(mat)}|${p.listSemantics().sort().join(',')}|${p.getMode()}`;
+      const sig = `${root.listMaterials().indexOf(mat)}|${p.listSemantics().sort().join(',')}|${p.getMode()}${vis ? `|${visGroup(node, p)}` : ''}`;
       if (!groups.has(sig)) groups.set(sig, []);
       groups.get(sig).push({ node, prim: p });
     }
@@ -232,6 +234,7 @@ for (const key of keys) {
     for (const node of list) node.dispose();
   }
   if (!inst.listProperties().length) inst.dispose();
+  if (vis) visStats.add(tagVis(vis, scene));
 
   await doc.transform(prune({ keepAttributes: true }), reorder({ encoder: MeshoptEncoder }), quantize({ pattern: /^(NORMAL|TANGENT)$/ }));
   doc.createExtension(EXTMeshoptCompression).setRequired(true).setEncoderOptions({ method: EXTMeshoptCompression.EncoderMethod.QUANTIZE });
@@ -284,4 +287,5 @@ fs.writeFileSync(path.join(worldDir, 'chunks.json'), JSON.stringify(index));
 manifest.chunks = 'world/chunks.json';
 fs.writeFileSync(manifestFile, JSON.stringify(manifest, null, 2));
 const bytes = out.reduce((s, c) => s + fs.statSync(path.join(mapDir, c.file)).size, 0);
+if (vis) console.log(`vis: ${visStats.tagged} nodes tagged with their clusters, ${visStats.untagged} always drawn`);
 console.log(`${out.length} chunks, ${(bytes / 1048576).toFixed(1)} MB (world glb ${(fs.statSync(src).size / 1048576).toFixed(1)} MB), draws ${drawsBefore} -> ${drawsAfter}, ${((Date.now() - t0) / 1000).toFixed(1)}s`);

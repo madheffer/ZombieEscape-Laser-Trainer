@@ -27,6 +27,7 @@ import { spawnsHidden } from './entities/render-mode.js';
 import { applySelfIllum, tintSelfIllum } from './selfillum.js';
 import { uploadNow, uploadSpread, FRAME_BUDGET_MS } from './gpu-upload.js';
 import { ChunkOcclusion } from './occlusion.js';
+import { WorldVis } from './vis.js';
 
 const _estP = new THREE.Vector3(), _estS = new THREE.Vector3(); // modelEstimate scratch
 const _skyM = new THREE.Matrix4();
@@ -170,10 +171,12 @@ export class Renderer {
 
   // the whole world glb, or null for a streamed map (its chunks come through addWorldChunk)
   // water: the map's baked water textures (loadMap's map.water; null for an older bake)
-  setWorld(scene, water = null) {
+  // vis: the map's CS2 visibility table (lib/vis-table.js, null without one): world/vis.js culls by it; ?novis doesn't
+  setWorld(scene, water = null, vis = null) {
     for (const c of this.chunks) this.occlusion?.forget(c.object);
     this.chunks = [];
     this.worldRoot.clear();
+    this.vis = vis && !new URLSearchParams(location.search).has('novis') ? new WorldVis(vis) : null;
     this.viewBox = null; // a stage sets its own (setViewBox)
     this.water.setMap(water);
     this.worldMaterials = new Map(); // a streamed world's materials by name: one per vmat across every chunk
@@ -229,6 +232,7 @@ export class Renderer {
     await programs;
     await uploadSpread(this.renderer, scene, attached, () => (this.loadingStage ? 50 : FRAME_BUDGET_MS));
     if (!attached()) return;
+    this.vis?.track(scene); // after the compile, which builds only what is visible (world/vis.js hides by the PVS)
     scene.visible = true;
     const box = new THREE.Box3();
     scene.updateMatrixWorld(true);
@@ -254,7 +258,8 @@ export class Renderer {
     let local = o.geometry.boundingBox;
     if (o.isInstancedMesh) { if (!o.boundingBox) o.computeBoundingBox(); local = o.boundingBox; }
     else if (!local) { o.geometry.computeBoundingBox(); local = o.geometry.boundingBox; }
-    o.visible = o.userData.drawn && boxInView(this.viewBox, local, o.matrixWorld);
+    o.userData.inBox = boxInView(this.viewBox, local, o.matrixWorld);
+    o.visible = o.userData.drawn && o.userData.inBox && o.userData.pvs !== false; // pvs: world/vis.js
   }
 
   // An entity model's bounds in its own space (Source units) before the model is loaded: its collision hulls
@@ -307,6 +312,15 @@ export class Renderer {
     if (local.isEmpty()) return false;
     const box = (this._entBox ||= new THREE.Box3()).copy(local).applyMatrix4(g.matrix);
     return this.occlusion.hides(box, this.chunks, this.camera);
+  }
+
+  // an entity visual in clusters the camera's can see (world/vis.js; always without the map's vis). Not particle
+  // effects or beams: their box (the sprites' one quad, the entity's origin) isn't where they reach, and a beam from
+  // a room you can't see may cross the one you're in; particles are culled by their own bounds (fx/effects.js)
+  entityInPvs(g) {
+    if (!this.vis || g.userData.sky) return true;
+    if (g.userData.fx || g.children.some((c) => c.userData.kind === 'beam' || c.userData.kind === 'fx')) return true; // an effect spawns after its entity: asked each time
+    return this.vis.entityVisible(g, this.entityLocalBox(g), g.matrix);
   }
 
   // the open map's skins (world/skins.js), with this renderer's material passes for a swapped material
@@ -681,7 +695,7 @@ export class Renderer {
         if (!s) continue;
         g.matrix.copy(s.m);
         this.loadPending(g);
-        if (g.visible) g.visible = !this.fadedOut(g) && this.entityInView(g) && !this.entityOccluded(g);
+        if (g.visible) g.visible = !this.fadedOut(g) && this.entityInView(g) && !this.entityOccluded(g) && this.entityInPvs(g);
         g.matrixWorldNeedsUpdate = true;
         for (const c of g.children) {
           const k = c.userData.kind;
@@ -702,7 +716,7 @@ export class Renderer {
       if (g.userData.sky && g.userData.model) skyMeshes(g.userData.model, e.sky.scale);
       this.loadPending(g);
       const on = e.alive && e.visible;
-      g.visible = on && !this.fadedOut(g) && this.entityInView(g) && !this.entityOccluded(g);
+      g.visible = on && !this.fadedOut(g) && this.entityInView(g) && !this.entityOccluded(g) && this.entityInPvs(g);
       for (const c of g.children) {
         const k = c.userData.kind;
         if (k === 'fx') c.visible = !!e.state.active;
@@ -770,6 +784,7 @@ export class Renderer {
     this.effects.frame(performance.now() / 1000);
     (this.sceneCopy ||= new SceneCopy(this.scene, () => refractWanted() || this.water.wantsCopy || sceneCopyWanted())).frame(r, this.hdr, this.camera);
     // the chunks the last frames' queries found hidden stay out of this one; a world in one piece has nothing to cull
+    this.vis?.update(this.camera.position); // CS2's PVS from the camera's cell (world/vis.js)
     const occlude = this.occlusion && this.chunks.length > 1;
     if (occlude) this.occlusion.apply(this.chunks, this.camera);
     r.setRenderTarget(this.hdr);

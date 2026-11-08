@@ -319,7 +319,7 @@ async function loadStage() {
     if (fxBvh) data.collisionFx.bvh = fxBvh;
     G.stream?.dispose();
     G.stream = null;
-    G.renderer.setWorld(data.world, data.water);
+    G.renderer.setWorld(data.world, data.water, data.vis);
     G.renderer.setSky(data.sky2d); // a Source 1 map's 2D skybox (null otherwise)
     G.s1look?.dispose();
     G.s1look = await Source1Look.load(data); // its swapped skies and colour lookups (world/source1-look.js; null for CS2)

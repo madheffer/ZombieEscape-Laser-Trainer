@@ -110,6 +110,9 @@ public static class Program
             // lasers-bake --scan <workshop/content/730> <out.json>: rank a local library for laser maps (LibraryScan.cs)
             return LibraryScan.Run(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]));
         }
+        if (args.Length >= 3 && args[0] == "--vis")
+            // lasers-bake --vis <workshop.vpk> <web/public/maps/<name>>: only vis.bin + manifest "vis" (VisBake.cs)
+            return VisBake.Run(Path.GetFullPath(args[1]), Path.GetFullPath(args[2]));
         if (args.Length >= 3 && args[0] == "--overview")
         {
             // lasers-bake --overview <workshop.vpk> <web/public/maps/<name>>: only the map's radar (OverviewBake.cs)
@@ -455,6 +458,9 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
         // 7. overview/: the map's CS2 radar for the minimap (OverviewBake.cs)
         OverviewBake.Write([map, outer], mapName, outDir, Log);
 
+        // 8. vis.bin: CS2's precomputed visibility, for culling what can't be seen from the camera (VisBake.cs)
+        var hasVis = VisBake.Write(loader, mapName, outDir, Log);
+
         var manifest = new JsonObject
         {
             ["map"] = mapName,
@@ -470,6 +476,7 @@ sealed class Baker(string input, string outRoot, string? cs2, bool textures)
             ["missingMaterials"] = new JsonArray([.. missing.Select(x => (JsonNode)x!)]),
         };
         if (soundEvents > 0) manifest["soundEvents"] = "soundevents.json";
+        if (hasVis) manifest["vis"] = VisBake.File;
         File.WriteAllText(Path.Combine(outDir, ModelBake.IndexFile), animations.ToJsonString(Json));
         manifest["animations"] = ModelBake.IndexFile;
         File.WriteAllText(Path.Combine(outDir, "manifest.json"), manifest.ToJsonString(JsonPretty));

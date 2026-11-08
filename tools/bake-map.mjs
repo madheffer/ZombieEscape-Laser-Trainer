@@ -21,6 +21,8 @@
 //   index     web/public/maps/index.json (the map picker)
 //   physics   (only when asked: the map step does it) the compiled physics for Rubikon -> physics.bin (lasers-bake
 //             --physics), for a map baked before Rubikon
+//   vis       (only when asked: the map step does it) CS2's precomputed visibility -> vis.bin (lasers-bake --vis), for
+//             a map baked before it; run chunks after it (the chunks carry the vis tags)
 //   water     (only when asked: the map step does it) the water shaders' textures -> water/ (lasers-bake --water), for a
 //             map baked before water was ported
 import fs from 'node:fs';
@@ -34,7 +36,7 @@ const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const mapsDir = path.join(repo, 'web', 'public', 'maps');
 const STEPS = ['map', 'entwatch', 'stripper', 'lighting', 'tiers', 'chunks', 'index'];
 // steps you can ask for that the default run doesn't need on its own (the map step already does them)
-const EXTRA_STEPS = ['water', 'physics'];
+const EXTRA_STEPS = ['water', 'physics', 'vis'];
 
 const opts = { steps: STEPS, build: true, cs2: null, workshop: null, all: false, scenarios: false };
 const targets = [];
@@ -124,7 +126,7 @@ function exePath() {
   return fail('lasers-bake isn\'t built (drop --skip-build)');
 }
 
-const needsBake = opts.steps.some((s) => s === 'map' || s === 'lighting' || s === 'tiers' || s === 'water' || s === 'physics');
+const needsBake = opts.steps.some((s) => s === 'map' || s === 'lighting' || s === 'tiers' || s === 'water' || s === 'physics' || s === 'vis');
 if (needsBake && opts.build) run('dotnet', ['build', path.join(repo, 'bake'), '-c', 'Release', '--nologo', '-v', 'q']);
 const exe = needsBake ? exePath() : null;
 const cs2 = opts.cs2 ? ['--cs2', path.resolve(opts.cs2)] : [];
@@ -136,7 +138,7 @@ for (const t of targets) {
   // the folder this VPK baked to: the manifest whose source is this VPK (the map name comes from inside the VPK)
   const norm = (p) => path.resolve(p).toLowerCase();
   const baked = bakedMaps().find((m) => m.source && norm(m.source) === norm(vpk));
-  const later = opts.steps.filter((s) => s === 'entwatch' || s === 'stripper' || s === 'lighting' || s === 'tiers' || s === 'chunks' || s === 'water' || s === 'physics');
+  const later = opts.steps.filter((s) => s === 'entwatch' || s === 'stripper' || s === 'lighting' || s === 'tiers' || s === 'chunks' || s === 'water' || s === 'physics' || s === 'vis');
   if (!later.length) continue;
   if (!baked) fail(`${t}: no map folder in ${mapsDir} came from ${vpk}; run the map step first`);
   const dir = path.join(mapsDir, baked.name);
@@ -147,6 +149,7 @@ for (const t of targets) {
   if (opts.steps.includes('lighting')) run(exe, ['--lighting', vpk, dir]);
   if (opts.steps.includes('water') && !opts.steps.includes('map')) run(exe, ['--water', vpk, dir, ...cs2]);
   if (opts.steps.includes('physics') && !opts.steps.includes('map')) run(exe, ['--physics', vpk, mapsDir, ...cs2]);
+  if (opts.steps.includes('vis') && !opts.steps.includes('map')) run(exe, ['--vis', vpk, dir]);
   if (opts.steps.includes('tiers')) run(exe, ['--tiers', vpk, dir]);
   if (opts.steps.includes('chunks')) {
     // tools' own packages (glTF-Transform, meshoptimizer), once; a fixed command, so the shell is safe here
